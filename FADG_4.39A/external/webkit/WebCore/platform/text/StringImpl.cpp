@@ -719,7 +719,7 @@ PassRefPtr<StringImpl> StringImpl::replace(UChar pattern, StringImpl* replacemen
     // If we have 0 matches, we don't have to do any more work
     if (!matchCount)
         return this;
-
+    
     if (repStrLength && matchCount > numeric_limits<unsigned>::max() / repStrLength)
         CRASH();
 

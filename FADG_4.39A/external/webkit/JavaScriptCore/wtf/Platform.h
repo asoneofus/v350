@@ -503,6 +503,8 @@
 #define ENABLE_JSC_MULTIPLE_THREADS 1
 #endif
 
+#define ENABLE_WML                         1
+
 /* On Windows, use QueryPerformanceCounter by default */
 #if OS(WINDOWS)
 #define WTF_USE_QUERY_PERFORMANCE_COUNTER  1

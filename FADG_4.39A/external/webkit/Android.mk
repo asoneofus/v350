@@ -22,6 +22,9 @@
 ## (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 ## OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ##
+#WeiChihChen@20110906@build this libwebcore if QCOM_TARGET_BRANCH is not gingerbread_chocolate
+#WeiChihChen@20110613@build this libwebcore if QCOM_TARGET_BRANCH is not gingerbread_house
+ifeq ($(filter gingerbread_house gingerbread_chocolate,$(QCOM_TARGET_BRANCH)),)
 
 LOCAL_PATH := $(call my-dir)
 
@@ -166,6 +169,9 @@ LOCAL_C_INCLUDES := $(LOCAL_C_INCLUDES) \
 	$(LOCAL_PATH)/JavaScriptCore/wtf \
 	$(LOCAL_PATH)/JavaScriptCore/wtf/unicode \
 	$(LOCAL_PATH)/JavaScriptCore/wtf/unicode/icu
+
+LOCAL_C_INCLUDES := $(LOCAL_C_INCLUDES) \
+    $(LOCAL_PATH)/WebCore/wml
 
 LOCAL_C_INCLUDES := $(LOCAL_C_INCLUDES) \
 	$(base_intermediates)/WebCore/ \
@@ -373,3 +379,7 @@ include $(BASE_PATH)/WebKit/android/benchmark/Android.mk
 
 # Build the webkit merge tool.
 include $(BASE_PATH)/WebKitTools/android/webkitmerge/Android.mk
+
+endif #ifeq ($(filter gingerbread_house gingerbread_chocolate,$(QCOM_TARGET_BRANCH)),)
+#WeiChihChen@20110613@build this libwebcore if QCOM_TARGET_BRANCH is not gingerbread_house
+#WeiChihChen@20110906@build this libwebcore if QCOM_TARGET_BRANCH is not gingerbread_chocolate

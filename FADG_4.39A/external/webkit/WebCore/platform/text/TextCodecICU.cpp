@@ -38,6 +38,12 @@
 #include <wtf/StringExtras.h>
 #include <wtf/Threading.h>
 
+//Justin add 20110304  Begin
+#ifdef FIH_RTSP_PATTERN
+#include "unicode/uregex.h"
+#include "unicode/parseerr.h"
+#endif
+//Justin add 20110304 End
 using std::min;
 
 namespace WebCore {
@@ -471,3 +477,38 @@ CString TextCodecICU::encode(const UChar* characters, size_t length, Unencodable
 
 
 } // namespace WebCore
+ //Justin add 20110304 Begin
+#ifdef FIH_RTSP_PATTERN
+bool regex_findtext_mot(const UChar* chars, unsigned length, WebCore::String pattern, int& start, int& end)
+{
+    UErrorCode status = U_ZERO_ERROR;
+    bool result = false;
+    bool bFound = false;
+    UParseError error;
+    error.offset = -1;
+    URegularExpression* regex = uregex_open(pattern.characters(), pattern.length(), UREGEX_ERROR_ON_UNKNOWN_ESCAPES, &error, &status);
+    if (!U_SUCCESS(status)) {
+        goto FAIL;
+    }
+    status = U_ZERO_ERROR;
+    uregex_setText(regex, chars, length, &status);
+    if (!U_SUCCESS(status)) {
+        goto FAIL;
+    }
+    status = U_ZERO_ERROR;
+    bFound = uregex_find(regex, 0, &status);
+    if (!U_SUCCESS(status) || !bFound) {
+        goto FAIL;
+    }
+    start = uregex_start(regex, 0, &status);
+    end = uregex_end(regex, 0, &status);
+    if (!U_SUCCESS(status)) {
+        goto FAIL;
+    }
+    result = true;
+FAIL:
+    uregex_close(regex);
+    return result;
+}
+#endif
+ //Justin add 20110304 End

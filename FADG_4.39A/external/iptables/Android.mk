@@ -53,7 +53,7 @@ PF_EXT_SLIB+=hashlimit helper icmp iprange length limit mac multiport #2mark
 PF_EXT_SLIB+=owner physdev pkttype policy realm sctp standard state tcp 
 PF_EXT_SLIB+=2tcpmss 2tos 2ttl udp unclean CLASSIFY CONNMARK DNAT LOG #DSCP ECN
 PF_EXT_SLIB+=MASQUERADE MIRROR NETMAP NFQUEUE NOTRACK REDIRECT REJECT #MARK
-PF_EXT_SLIB+=SAME SNAT ULOG # TOS TCPMSS TTL
+PF_EXT_SLIB+=SAME SNAT ULOG TOS TCPMSS TTL
 
 EXT_FUNC+=$(foreach T,$(PF_EXT_SLIB),ipt_$(T))
 

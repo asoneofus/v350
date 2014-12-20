@@ -155,10 +155,10 @@ static void Open(JNIEnv* env, jobject obj, jstring path)
         }
     }
     if (didSetPermissions) {
-        LOGV("Opening WebIconDatabase file '%s'", pathStr.latin1().data());
-        bool res = iconDb->open(pathStr);
-        if (!res)
-            LOGE("Open failed!");
+    LOGV("Opening WebIconDatabase file '%s'", pathStr.latin1().data());
+    bool res = iconDb->open(pathStr);
+    if (!res)
+        LOGE("Open failed!");
     } else
         LOGE("Failed to set permissions on '%s'", fullPath.data());
 }

@@ -46,6 +46,10 @@
 #ifdef DEBUG_NAV_UI
 #include "CString.h"
 #endif
+#if defined (__CIT_MULTI_LANG_BIDI)
+#include "CitArabicShapes.h"
+#include <cutils/properties.h> 
+#endif
 
 #define VERBOSE_LOGGING 0
 // #define EXTRA_NOISY_LOGGING 1
@@ -320,6 +324,9 @@ public:
                 mMatrix->getScaleX(), mMatrix->getScaleY(),
                 mMatrix->getTranslateX(), mMatrix->getTranslateY(),
                 SkFixedToScalar(mMinSpaceWidth));
+#if defined (__CIT_MULTI_LANG_BIDI)
+			mMinSpaceWidth -= ((mMinSpaceWidth * 20) / 100); //fix issue where arabic words are not seperated.
+#endif
         }
         return mMinSpaceWidth;
     }
@@ -853,10 +860,18 @@ public:
         mFlipped = flipped;
         if (flipped)
             setFlippedState();
+#if defined (__CIT_MULTI_LANG_BIDI)
+			mLastX = 0;
+			bHasArabic = false;
+#endif
     }
 
     void addCharacter(const SkBounder::GlyphRec& rec)
     {
+#if defined (__CIT_MULTI_LANG_BIDI)
+		addCharacter_CIT(rec);
+		return;
+#endif
         if (mSelectStartIndex < 0)
             mSelectStartIndex = mSelectText.count();
         if (!mSkipFirstSpace) {
@@ -882,13 +897,104 @@ public:
                 *mSelectText.append() = chars[1];
         }
     }
+#if defined (__CIT_MULTI_LANG_BIDI)
+	void addCharacter_CIT(const SkBounder::GlyphRec& rec)
+    {
+        if (mSelectStartIndex < 0)
+            mSelectStartIndex = mSelectLine.count();
+        if (!mSkipFirstSpace) {
+            if (addNewLine(rec)) {
+                DBG_NAV_LOG("write new line");
+                *mSelectLine.append() = '\n';
+                *mSelectLine.append() = '\n';
+            } else if (addSpace(rec)) {
+                DBG_NAV_LOG("write space");
+                *mSelectLine.append() = ' ';
+            }
+        } else
+            mSkipFirstSpace = false;
+        recordGlyph(rec);
+        finishGlyph();
+        if (VERBOSE_LOGGING) DBG_NAV_LOGD("glyphID=%d uni=%d '%c'", rec.fGlyphID,
+            mLastUni, mLastUni && mLastUni < 0x7f ? mLastUni : '?');
+        if (mLastUni) {
+            uint16_t chars[2];
+			if(mLastUni >= 0xfe80 && mLastUni <= 0xfefc)
+				{
+					if(mLastUni >= 0xfef5 && mLastUni <= 0xfefc)//arabic special characters
+					{
+						switch(mLastUni)
+						{
+							case 0xfef5:
+							case 0xfef6:
+								*mSelectLine.append() = 0x0622; //alef madda above
+								break;
+							case 0xfef7:
+							case 0xfef8:
+								*mSelectLine.append() = 0x0623;//alef hamza above
+							break;
+							case 0xfef9:
+							case 0xfefa:
+								*mSelectLine.append() = 0x0625;//alef hamza below
+							break;
+							case 0xfefb:
+							case 0xfefc:
+								*mSelectLine.append() = 0x0627;//alef
+							break;
+						}
+						mLastUni = 0x0644;//then append the lam
+					} else {
+					mLastUni = glyphLookup[mLastUni - 0xfe80].code;
+					}
+					bHasArabic = true;
+			} else if(mLastUni >= 0x600 && mLastUni <= 0x06FF){
+				bHasArabic = true;
+			} else if(mLastUni >= 0xFBFC && mLastUni <= 0xFBFF){
+				mLastUni = specialGlyphLookup[mLastUni - 0xfbfc].code;
+				bHasArabic = true;
+				}
+            size_t count = SkUTF16_FromUnichar(mLastUni, chars);
+			if(rec.fLSB.fX < mLastX) //new line
+				{
+					//reverse, append and clear
+					uint16_t* pszText=new uint16_t[mSelectLine.count()];
+					if(pszText)
+					{
+						memcpy(pszText,mSelectLine.begin(),mSelectLine.count() * sizeof(uint16_t));
+						if(bHasArabic){
+						(*mPaint).prepareArabicText(pszText,mSelectLine.count()); // reverse this line
+							bHasArabic = false;
+						}
+						if(mSelectText.count() > 0)
+						{
+							const uint16_t mLast = mSelectText.top();
+							if(mLast != ' ')
+								*mSelectText.append() = ' ';
+						}
+						for(int i=0; i<mSelectLine.count(); i++)
+						{
+							*mSelectText.append() = pszText[i]; //append	
+						}
+						delete[] pszText;
+						mSelectLine.reset();
 
+					}
+				}
+            *mSelectLine.append() = chars[0];
+            if (count == 2)
+                *mSelectLine.append() = chars[1];
+			mLastX = rec.fLSB.fX;
+        }
+    }
+#endif
     void addLast()
     {
+
         *mSelectBounds.append() = mLast;
         *mSelectStart.append() = mSelectStartIndex;
         *mSelectEnd.append() = mSelectText.count();
     }
+
 
     /* Text characters are collected before it's been determined that the
        characters are part of the selection. The bounds describe valid parts
@@ -962,6 +1068,9 @@ public:
     }
 
     WebCore::String text() {
+#if defined (__CIT_MULTI_LANG_BIDI)
+		return text_CIT();
+#endif
         if (mFlipped)
             finish();
         // the text has been copied in visual order. Reverse as needed if
@@ -979,7 +1088,36 @@ public:
         }
         return WebCore::String(mSelectText.begin(), mSelectText.count());
     }
+#if defined (__CIT_MULTI_LANG_BIDI)
+    WebCore::String text_CIT() {
+       if(mSelectLine.count())
+		{
+				uint16_t* pszText=new uint16_t[mSelectLine.count()];
+					if(pszText)
+					{
+						memcpy(pszText,mSelectLine.begin(),mSelectLine.count() * sizeof(uint16_t));
+						if(bHasArabic){
+						(*mPaint).prepareArabicText(pszText,mSelectLine.count()); // reverse this line
+							bHasArabic = false;
+						}
+						if(mSelectText.count() > 0)
+						{
+							const uint16_t mLast = mSelectText.top();
+							if(mLast != ' ')
+								*mSelectText.append() = ' ';
+						}
+						for(int i=0; i<mSelectLine.count(); i++)
+						{
+							*mSelectText.append() = pszText[i]; //append	
+						}
+						delete[] pszText;
+						mSelectLine.reset();
 
+					}
+		}
+        return WebCore::String(mSelectText.begin(), mSelectText.count());
+    }
+#endif 
 protected:
     SkIRect mEmpty;
     SkTDArray<SkIRect> mSelectBounds;
@@ -987,6 +1125,11 @@ protected:
     SkTDArray<int> mSelectStart;
     int mSelectStartIndex;
     SkTDArray<uint16_t> mSelectText;
+#if defined (__CIT_MULTI_LANG_BIDI)
+	SkTDArray<uint16_t> mSelectLine;
+	int mLastX;
+	bool bHasArabic;
+#endif
     bool mSkipFirstSpace;
 private:
     typedef BuilderCheck INHERITED;
@@ -1411,6 +1554,16 @@ const String SelectText::getSelection()
         return String();
     SkIRect clipRect;
     clipRect.set(0, 0, m_picture->width(), m_picture->height());
+	#if defined (__CIT_MULTI_LANG_BIDI)
+    //=====================================[MOBIDIV_ISCREEN_START]========================================
+
+   		clipRect.set(m_visibleRect.fLeft, m_visibleRect.fTop, m_visibleRect.fRight, m_visibleRect.fBottom);
+    m_selRegion.setEmpty();
+    buildSelection(*m_picture, clipRect, m_selStart, m_startBase, m_selEnd, m_endBase, &m_selRegion);
+
+	// =====================================[MOBIDIV_ISCREEN_END]========================================
+	#endif
+
     String result = text(*m_picture, clipRect, m_selStart, m_startBase,
         m_selEnd, m_endBase, m_flipped);
     DBG_NAV_LOGD("clip=(%d,%d,%d,%d)"

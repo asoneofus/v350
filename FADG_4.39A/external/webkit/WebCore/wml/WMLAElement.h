@@ -46,6 +46,7 @@ public:
     virtual bool isURLAttribute(Attribute*) const;
 
     virtual String target() const;
+    virtual String href() const;
 };
 
 }

@@ -160,6 +160,11 @@ private:
     SkRect addMatchNormal(int index,
         const SkPaint& paint, int count, const uint16_t* glyphs,
         const SkScalar pos[], SkScalar y);
+#if defined (__CIT_MULTI_LANG_BIDI)
+	SkRect addMatchNormal_CIT(int index,
+        const SkPaint& paint, int count, const uint16_t* glyphs,
+        const SkScalar pos[], SkScalar y);
+#endif
 
     SkRect addMatchPos(int index,
         const SkPaint& paint, int count, const uint16_t* glyphs,
@@ -208,6 +213,9 @@ private:
     SkRegion                mWorkingRegion;
     int                     mWorkingIndex;
     int                     mLayerId;
+#if defined (__CIT_MULTI_LANG_BIDI)
+	int						mTotalChars;
+#endif
 };
 
 class FindOnPage : public DrawExtra {

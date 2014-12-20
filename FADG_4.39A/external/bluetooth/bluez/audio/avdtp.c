@@ -87,7 +87,14 @@
 #define AVDTP_MSG_TYPE_ACCEPT			0x02
 #define AVDTP_MSG_TYPE_REJECT			0x03
 
-#define REQ_TIMEOUT 4
+/* FIHTDC, JangYan Hung, 2011/06/02 */
+/* Modify the value of REQ_TIMEOUT from 4 to 15 to avoid the following problem:
+   In Bluetooth settings, the status of BT headset which supports A2DP
+   function will become "Connected to phone audio" (from "Connected to phone 
+   and media audio") after running 'Scan for devices', that is to say,
+   'media audio' disappear! */
+#define REQ_TIMEOUT 15
+
 #define ABORT_TIMEOUT 2
 #define DISCONNECT_TIMEOUT 1
 #define STREAM_TIMEOUT 20
@@ -3189,8 +3196,12 @@ int avdtp_discover(struct avdtp *session, avdtp_discover_cb_t cb,
 {
 	int err;
 
-	if (session->discov_cb)
-		return -EBUSY;
+	if (session->discov_cb){
+		///////////Thomas DMO.B-375 2011.6.8/////////////////////
+		session->discov_cb = NULL;
+		///////////Thomas DMO.B-375 2011.6.8/////////////////////
+	}
+	
 
 	if (session->seps) {
 		session->discov_cb = cb;

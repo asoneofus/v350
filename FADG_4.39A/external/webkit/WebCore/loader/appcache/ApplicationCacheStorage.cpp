@@ -626,7 +626,7 @@ bool ApplicationCacheStorage::store(ApplicationCacheResource* resource, unsigned
     ASSERT(!resource->storageID());
     
     openDatabase(true);
-
+    
     // openDatabase(true) could still fail, for example when cacheStorage is full or no longer available.
     if (!m_database.isOpen())
         return false;
@@ -716,7 +716,7 @@ bool ApplicationCacheStorage::store(ApplicationCacheResource* resource, Applicat
     ASSERT(cache->storageID());
     
     openDatabase(true);
-
+ 
     if (!m_database.isOpen())
         return false;
  

@@ -56,6 +56,9 @@ namespace WebCore {
     class ScrollView;
     class TimerBase;
     class PageGroup;
+#if ENABLE(WML)
+    class WMLAnchorElement;
+#endif
 }
 
 #if USE(ACCELERATED_COMPOSITING)
@@ -257,8 +260,9 @@ namespace android {
         //
         // Followings support calls from Java to native WebCore
         //
-
-
+#if ENABLE(WML)
+        WebCore::WMLAnchorElement* retrieveWMLAElement(WebCore::Frame* frame, WebCore::Node* node);
+#endif
         WebCore::String retrieveHref(WebCore::Frame* frame, WebCore::Node* node);
         WebCore::String retrieveAnchorText(WebCore::Frame* frame, WebCore::Node* node);
         WebCore::String requestLabel(WebCore::Frame* , WebCore::Node* );
@@ -358,6 +362,7 @@ namespace android {
         jobject getWebViewJavaObject();
 
         void setBackgroundColor(SkColor c);
+        void setColorInversion(bool invert);
         void updateFrameCache();
         void updateCacheOnNodeChange();
         void dumpDomTree(bool);
@@ -542,6 +547,7 @@ namespace android {
         bool m_check_domtree_version;
         PageGroup* m_groupForVisitedLinks;
         bool m_isPaused;
+        bool m_invertColor;
 
         SkTDArray<PluginWidgetAndroid*> m_plugins;
         WebCore::Timer<WebViewCore> m_pluginInvalTimer;

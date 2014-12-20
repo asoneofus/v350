@@ -189,7 +189,13 @@ private:
     int mParentIndex;
     int mTabIndex;
     mutable Condition mCondition : 5; // why the node was not chosen on the first pass
+ //Justin add 20110304 Begin
+#ifdef FIH_RTSP_PATTERN
     CachedNodeType mType : 4;
+#else
+    CachedNodeType mType : 3;
+#endif
+ //Justin add 20110304 End
     bool mClippedOut : 1;
     bool mDisabled : 1;
     bool mFixedUpCursorRects : 1;

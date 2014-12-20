@@ -27,6 +27,13 @@ LOCAL_CFLAGS:= \
 	-DANDROID \
 	-D__S_IFREG=0100000  # missing from bionic stat.h
 
+#Justin add 20110711 Begin
+ifeq ($(TARGET_DEVICE),SF8)
+LOCAL_CFLAGS+= \
+        -DSF8
+endif
+#Justin add 20110711 End
+
 LOCAL_C_INCLUDES:= \
 	$(LOCAL_PATH)/../lib \
 	$(LOCAL_PATH)/../gdbus \
@@ -37,8 +44,8 @@ LOCAL_C_INCLUDES:= \
 LOCAL_SHARED_LIBRARIES := \
 	libbluetooth \
 	libbluetoothd \
-	libdbus
-
+	libdbus\
+	libcutils
 
 LOCAL_MODULE_PATH := $(TARGET_OUT_SHARED_LIBRARIES)/bluez-plugin
 LOCAL_UNSTRIPPED_PATH := $(TARGET_OUT_SHARED_LIBRARIES_UNSTRIPPED)/bluez-plugin

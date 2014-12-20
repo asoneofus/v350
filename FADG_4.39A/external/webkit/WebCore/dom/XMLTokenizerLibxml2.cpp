@@ -1034,12 +1034,13 @@ void XMLTokenizer::internalSubset(const xmlChar* name, const xmlChar* externalID
         String extId = toString(externalID);
 #endif
 #if ENABLE(WML)
-        if (isWMLDocument()
+       /* if (isWMLDocument()
             && extId != "-//WAPFORUM//DTD WML 1.3//EN"
             && extId != "-//WAPFORUM//DTD WML 1.2//EN"
             && extId != "-//WAPFORUM//DTD WML 1.1//EN"
             && extId != "-//WAPFORUM//DTD WML 1.0//EN")
             handleError(fatal, "Invalid DTD Public ID", lineNumber(), columnNumber());
+        */
 #endif
 #if ENABLE(XHTMLMP)
         String dtdName = toString(name);

@@ -39,6 +39,10 @@
 #define HCI_UART_H4DS	3
 #define HCI_UART_LL	4
 
+//FIHTDC Gingerbread porting
+#define HCI_UART_IBS	5
+
+
 #define HCI_UART_RAW_DEVICE	0
 
 int read_hci_event(int fd, unsigned char* buf, int size);

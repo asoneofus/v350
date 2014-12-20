@@ -15,6 +15,9 @@
 ## limitations under the License.
 ##
 
+ifeq ($(HAVE_CIT_ARABIC),true)
+	LOCAL_CFLAGS += -D__CIT_MULTI_LANG_BIDI
+endif
 LOCAL_SRC_FILES := \
 	android/WebCoreSupport/CachedFramePlatformDataAndroid.cpp \
 	android/WebCoreSupport/ChromeClientAndroid.cpp \

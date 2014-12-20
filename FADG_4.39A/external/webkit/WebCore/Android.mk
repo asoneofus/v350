@@ -23,6 +23,11 @@
 ## OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ##
 
+## Begin CIT edit
+ifeq ($(HAVE_CIT_ARABIC),true)
+	LOCAL_CFLAGS += -D__CIT_MULTI_LANG_BIDI
+endif
+##end CIT update
 LOCAL_SRC_FILES := \
 	bindings/generic/BindingSecurityBase.cpp \
 	\
@@ -398,6 +403,7 @@ LOCAL_SRC_FILES := $(LOCAL_SRC_FILES) \
 	\
 	platform/android/ClipboardAndroid.cpp \
 	platform/android/CursorAndroid.cpp \
+        platform/android/DNS.cpp \
 	platform/android/DragDataAndroid.cpp \
 	platform/android/EventLoopAndroid.cpp \
 	platform/android/FileChooserAndroid.cpp \
@@ -918,6 +924,44 @@ LOCAL_SRC_FILES := $(LOCAL_SRC_FILES) \
 	svg/graphics/filters/SVGFilterBuilder.cpp \
 	svg/graphics/filters/SVGLightSource.cpp
 endif
+
+LOCAL_SRC_FILES := $(LOCAL_SRC_FILES) \
+	wml/WMLAccessElement.cpp \
+	wml/WMLAElement.cpp \
+	wml/WMLAnchorElement.cpp \
+	wml/WMLBRElement.cpp \
+	wml/WMLCardElement.cpp \
+	wml/WMLDocument.cpp \
+	wml/WMLDoElement.cpp \
+	wml/WMLElement.cpp \
+	wml/WMLErrorHandling.cpp \
+	wml/WMLEventHandlingElement.cpp \
+	wml/WMLFieldSetElement.cpp \
+	wml/WMLFormControlElement.cpp \
+	wml/WMLGoElement.cpp \
+	wml/WMLImageElement.cpp \
+	wml/WMLImageLoader.cpp \
+	wml/WMLInputElement.cpp \
+	wml/WMLInsertedLegendElement.cpp \
+	wml/WMLIntrinsicEvent.cpp \
+	wml/WMLIntrinsicEventHandler.cpp \
+	wml/WMLMetaElement.cpp \
+	wml/WMLNoopElement.cpp \
+	wml/WMLOnEventElement.cpp \
+	wml/WMLOptGroupElement.cpp \
+	wml/WMLOptionElement.cpp \
+	wml/WMLPageState.cpp \
+	wml/WMLPElement.cpp \
+	wml/WMLPostfieldElement.cpp \
+	wml/WMLPrevElement.cpp \
+	wml/WMLRefreshElement.cpp \
+	wml/WMLSelectElement.cpp \
+	wml/WMLSetvarElement.cpp \
+	wml/WMLTableElement.cpp \
+	wml/WMLTaskElement.cpp \
+	wml/WMLTemplateElement.cpp \
+	wml/WMLTimerElement.cpp \
+	wml/WMLVariables.cpp
 
 LOCAL_SRC_FILES := $(LOCAL_SRC_FILES) \
 	workers/AbstractWorker.cpp \

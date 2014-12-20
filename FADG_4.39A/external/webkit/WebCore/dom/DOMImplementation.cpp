@@ -284,8 +284,14 @@ PassRefPtr<HTMLDocument> DOMImplementation::createHTMLDocument(Frame* frame)
 
 bool DOMImplementation::isXMLMIMEType(const String& mimeType)
 {
-    if (mimeType == "text/xml" || mimeType == "application/xml" || mimeType == "text/xsl")
+    if (mimeType == "text/xml" || mimeType == "application/xml" || mimeType == "text/xsl" || mimeType == "text/vnd.wap.wml" )
         return true;
+
+    /* FihtdcCode@20100727 KolinKo F0XF.B-41, OMA Download DD MIME type support, begin*/
+    if (mimeType == "application/vnd.oma.dd+xml")
+        return false;
+    /*FihtdcCode@20100727 KolinKo F0XF.B-41, OMA Download DD MIME type support, end */
+    
     static const char* const validChars = "[0-9a-zA-Z_\\-+~!$\\^{}|.%'`#&*]"; // per RFCs: 3023, 2045
     DEFINE_STATIC_LOCAL(RegularExpression, xmlTypeRegExp, (String("^") + validChars + "+/" + validChars + "+\\+xml$", TextCaseSensitive));
     return xmlTypeRegExp.match(mimeType) > -1;

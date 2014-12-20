@@ -29,6 +29,7 @@
 #include "WebViewCore.h"
 
 #include "AtomicString.h"
+#include "Cache.h"
 #include "CachedNode.h"
 #include "CachedRoot.h"
 #include "Chrome.h"
@@ -69,6 +70,7 @@
 #include "InlineTextBox.h"
 #include "KeyboardCodes.h"
 #include "Navigator.h"
+#include "loader.h"
 #include "Node.h"
 #include "NodeList.h"
 #include "Page.h"
@@ -138,6 +140,11 @@ FILE* gRenderTreeFile = 0;
 #if USE(ACCELERATED_COMPOSITING)
 #include "GraphicsLayerAndroid.h"
 #include "RenderLayerCompositor.h"
+#endif
+
+#if ENABLE(WML)
+#include "WMLNames.h"
+#include "WMLAnchorElement.h"
 #endif
 
 /*  We pass this flag when recording the actual content, so that we don't spend
@@ -313,12 +320,16 @@ WebViewCore::WebViewCore(JNIEnv* env, jobject javaWebViewCore, WebCore::Frame* m
     m_forwardingTouchEvents = false;
 #endif
     m_isPaused = false;
+    m_invertColor = false;
 
     LOG_ASSERT(m_mainFrame, "Uh oh, somehow a frameview was made without an initial frame!");
 
     jclass clazz = env->GetObjectClass(javaWebViewCore);
     m_javaGlue = new JavaGlue;
+    /* FihtdcCode@20111019 CogiLiu for IRM.B-1807 Fix memory leak when use webview begin*/
+    //m_javaGlue->m_obj = env->NewGlobalRef(javaWebViewCore);
     m_javaGlue->m_obj = env->NewWeakGlobalRef(javaWebViewCore);
+    /* FihtdcCode@20111019 CogiLiu for IRM.B-1807 Fix memory leak when use webview end*/
     m_javaGlue->m_spawnScrollTo = GetJMethod(env, clazz, "contentSpawnScrollTo", "(II)V");
     m_javaGlue->m_scrollTo = GetJMethod(env, clazz, "contentScrollTo", "(II)V");
     m_javaGlue->m_scrollBy = GetJMethod(env, clazz, "contentScrollBy", "(IIZ)V");
@@ -383,7 +394,10 @@ WebViewCore::~WebViewCore()
 
     if (m_javaGlue->m_obj) {
         JNIEnv* env = JSC::Bindings::getJNIEnv();
+        /* FihtdcCode@20111019 CogiLiu for IRM.B-1807 Fix memory leak when use webview begin*/
+        //env->DeleteGlobalRef(m_javaGlue->m_obj);
         env->DeleteWeakGlobalRef(m_javaGlue->m_obj);
+        /* FihtdcCode@20111019 CogiLiu for IRM.B-1807 Fix memory leak when use webview end*/
         m_javaGlue->m_obj = 0;
     }
     delete m_javaGlue;
@@ -795,7 +809,7 @@ bool WebViewCore::drawContent(SkCanvas* canvas, SkColor color)
     canvas->clipRect(clip, SkRegion::kDifference_Op);
     canvas->drawColor(color);
     canvas->restoreToCount(sc);
-    bool tookTooLong = copyContent.draw(canvas);
+    bool tookTooLong = copyContent.draw(canvas, m_invertColor);
     m_contentMutex.lock();
     m_content.setDrawTimes(copyContent);
     m_contentMutex.unlock();
@@ -1168,6 +1182,9 @@ void WebViewCore::setScrollOffset(int moveGeneration, int dx, int dy)
     Frame* frame = (Frame*) m_cursorFrame;
     IntPoint location = m_cursorLocation;
     gCursorBoundsMutex.unlock();
+
+    cache()->loader()->setVisiblePosition(IntPoint(dx, dy));
+
     if (!hasCursorBounds)
         return;
     moveMouseIfLatest(moveGeneration, frame, location.x(), location.y());
@@ -1177,6 +1194,8 @@ void WebViewCore::setGlobalBounds(int x, int y, int h, int v)
 {
     DBG_NAV_LOGD("{%d,%d}", x, y);
     m_mainFrame->view()->platformWidget()->setWindowBounds(x, y, h, v);
+
+    cache()->loader()->setVisibleRect(IntRect(x, y, v, h));
 }
 
 void WebViewCore::setSizeScreenWidthAndScale(int width, int height,
@@ -1328,14 +1347,47 @@ WebCore::HTMLAnchorElement* WebViewCore::retrieveAnchorElement(WebCore::Frame* f
     return static_cast<WebCore::HTMLAnchorElement*>(node);
 }
 
+#if 1
+#if ENABLE(WML)
+WebCore::WMLAnchorElement* WebViewCore::retrieveWMLAElement(WebCore::Frame* frame, WebCore::Node* node) {
+    if (!CacheBuilder::validNode(m_mainFrame, frame, node))
+        return 0;
+    if (!node->hasTagName(WebCore::WMLNames::aTag))
+        return 0;
+    return static_cast<WebCore::WMLAnchorElement*>(node);
+}
+#endif
+
+WebCore::String WebViewCore::retrieveHref(WebCore::Frame* frame, WebCore::Node* node) {
+
+#if ENABLE(WML)
+    if (node->isWMLElement()) {
+        WebCore::WMLAnchorElement* anchor = retrieveWMLAElement(frame, node);
+        return anchor ? anchor->href() : WebCore::String();
+    }
+#endif
+    WebCore::HTMLAnchorElement* anchor = retrieveAnchorElement(frame, node);
+    return anchor ? anchor->href() : WebCore::String();
+}
+
+#else
 WebCore::String WebViewCore::retrieveHref(WebCore::Frame* frame, WebCore::Node* node)
 {
     WebCore::HTMLAnchorElement* anchor = retrieveAnchorElement(frame, node);
     return anchor ? anchor->href() : WebCore::String();
 }
+#endif
 
 WebCore::String WebViewCore::retrieveAnchorText(WebCore::Frame* frame, WebCore::Node* node)
 {
+    /**retrieve WMLAnchor element. 20110224, begin**/
+#if ENABLE(WML)
+    if (node->isWMLElement()) {
+        WebCore::WMLAnchorElement* anchor = retrieveWMLAElement(frame, node);
+        return anchor ? anchor->title() : WebCore::String();
+    }
+#endif
+    /**retrieve WMLAnchor element. 20110224, end**/
     WebCore::HTMLAnchorElement* anchor = retrieveAnchorElement(frame, node);
     return anchor ? anchor->text() : WebCore::String();
 }
@@ -2441,6 +2493,17 @@ void WebViewCore::setBackgroundColor(SkColor c)
         view->setTransparent(true);
 }
 
+void WebViewCore::setColorInversion(bool invert)
+{
+    if (m_invertColor != invert) {
+        m_invertColor = invert;
+        if (invert)
+            DBG_SET_LOG("color invert active");
+        else
+            DBG_SET_LOG("no color invert");
+    }
+}
+
 jclass WebViewCore::getPluginClass(const WebCore::String& libName, const char* className)
 {
     JNIEnv* env = JSC::Bindings::getJNIEnv();
@@ -2962,6 +3025,14 @@ static void SetBackgroundColor(JNIEnv *env, jobject obj, jint color)
     viewImpl->setBackgroundColor((SkColor) color);
 }
 
+static void SetColorInversion(JNIEnv *env, jobject obj, jboolean invert)
+{
+    WebViewCore* viewImpl = GET_NATIVE_VIEW(env, obj);
+    LOG_ASSERT(viewImpl, "viewImpl not set in %s", __FUNCTION__);
+
+    viewImpl->setColorInversion(invert);
+}
+
 static void DumpDomTree(JNIEnv *env, jobject obj, jboolean useFile)
 {
     WebViewCore* viewImpl = GET_NATIVE_VIEW(env, obj);
@@ -3241,6 +3312,8 @@ static JNINativeMethod gJavaWebViewCoreMethods[] = {
         (void*) SplitContent },
     { "nativeSetBackgroundColor", "(I)V",
         (void*) SetBackgroundColor },
+    { "nativeSetColorInversion", "(Z)V",
+        (void*) SetColorInversion },
     { "nativeRegisterURLSchemeAsLocal", "(Ljava/lang/String;)V",
         (void*) RegisterURLSchemeAsLocal },
     { "nativeDumpDomTree", "(Z)V",

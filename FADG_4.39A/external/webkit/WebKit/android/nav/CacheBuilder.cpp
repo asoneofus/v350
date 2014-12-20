@@ -62,7 +62,11 @@
 #include "WebCoreViewBridge.h"
 #include "Widget.h"
 #include <wtf/unicode/Unicode.h>
-
+//Justin add 20110304 Begin
+#ifdef FIH_RTSP_PATTERN
+extern bool regex_findtext_mot(const UChar* chars, unsigned length, String pattern, int& start, int& end);
+#endif
+ //Justin add 20110304 End
 #ifdef DUMP_NAV_CACHE_USING_PRINTF
     FILE* gNavCacheLogFile = NULL;
     android::Mutex gWriteLogMutex;
@@ -2322,11 +2326,123 @@ nextAt:
     return FOUND_NONE;
 }
 
+ //Justin add 20110304 Begin
+#ifdef FIH_RTSP_PATTERN
+#define RTSP_PATTERN "rtsp://([a-z]|[0-9]|[\\./])+"
+#define MAX_PHONE_NUMBER 512
+CacheBuilder::FoundState CacheBuilder::FindPartialRTSP(const UChar* chars, unsigned length,
+    FindState* s)
+{
+    UChar* store = s->mStorePtr;
+    FindState* findState = s;
+    String src =  String(RTSP_PATTERN);
+    if(!regex_findtext_mot(chars, length, src, findState->mStartResult, findState->mEndResult) || MAX_PHONE_NUMBER < (findState->mEndResult-findState->mStartResult))
+        return FOUND_NONE;
+    for(int i = findState->mStartResult; i < findState->mEndResult; i++) {
+        *store++ = chars[i];
+    }
+    return FOUND_COMPLETE;
+}
+#endif
+ //Justin add 20110304 End
+ 
 #define PHONE_PATTERN "(200) /-.\\ 100 -. 0000" // poor man's regex: parens optional, any one of punct, digit smallest allowed
 
 CacheBuilder::FoundState CacheBuilder::FindPartialNumber(const UChar* chars, unsigned length, 
     FindState* s)
 {
+ //Justin add 20110304 Begin
+/* This is CT Requirement for enhance parser Phone Number */  
+/*#ifdef FIH_PHONE_NUMBER_PATTERN */
+#if 1
+    memset(s, 0, sizeof(FindState));
+    s->mCurrent = ' ';
+    s->mOpenParen = false;
+    s->mStorePtr = s->mStore;
+    FoundState ctresult = FOUND_NONE;
+    char* pattern = s->mPattern;
+    UChar* store = s->mStorePtr;
+    const UChar* start = chars;
+    const UChar* end = chars + length;
+    const UChar* lastDigit = NULL;
+    UChar nextc;
+    int storednumber = 0;
+    do {
+        bool initialized = s->mInitialized;
+        bool lastisSeparate = false;
+        storednumber = 0;
+        while (chars < end) {
+            UChar ch = s->mCurrent = *chars;
+            if (WTF::isASCIIDigit(ch) == true) {
+                if (initialized == false) {
+                    s->mStartResult = chars - start;
+                    initialized = true;
+                }
+                if (lastisSeparate == true)
+                    lastisSeparate = false;
+                *store++ = ch;
+                storednumber++;
+                lastDigit = chars;
+                if (storednumber < NAVIGATION_MAX_PHONE_LENGTH) {
+                    goto nextCharCT;
+                } else {
+                    goto resetPatternCT;
+                }
+            } else {
+                switch (ch) {
+                    case '-':
+                    case '(':
+                    case ')':
+                        if (lastisSeparate == false) {
+                            lastisSeparate = true;
+                            goto nextCharCT;
+                        } else {
+                            goto resetPatternCT;
+                        }
+                    case ' ':
+                        goto nextCharCT;
+                    case '+':
+                        nextc = *(chars+1);
+                        if (initialized == false && WTF::isASCIIDigit(nextc) == true) {
+                            s->mStartResult = chars - start;
+                            initialized = true;
+                            *store++ = ch;
+                            storednumber++;
+                            lastDigit = chars;
+                            goto nextCharCT;
+                        }
+                        goto resetPatternCT;
+                    default:
+                        goto resetPatternCT;
+                }
+            }
+    nextCharCT:
+            chars++;
+        }
+        break;
+resetPatternCT:
+        if (storednumber >=5 && storednumber <= NAVIGATION_MAX_PHONE_LENGTH ) {
+            ctresult = FOUND_COMPLETE;
+            goto checkMatchCT;
+        } else {
+            s->mOpenParen = false;
+            s->mStorePtr = s->mStore;
+            pattern = s->mPattern;
+            store = s->mStorePtr;
+            storednumber = 0;
+        }
+    } while (++chars < end);
+checkMatchCT:
+    if (storednumber >=5 && storednumber <= NAVIGATION_MAX_PHONE_LENGTH )
+        ctresult = FOUND_COMPLETE;
+    *store = '\0';
+    s->mStorePtr = store;
+    s->mPattern = pattern;
+    s->mEndResult = lastDigit - start + 1;
+    return ctresult;
+  
+#else
+ //Justin add 20110304 End
     char* pattern = s->mPattern;
     UChar* store = s->mStorePtr;
     const UChar* start = chars;
@@ -2405,6 +2521,10 @@ checkMatch:
     char pState = pattern[0];
     return pState == '\0' ? FOUND_COMPLETE : pState == '(' || (WTF::isASCIIDigit(pState) && WTF::isASCIIDigit(pattern[-1])) ? 
         FOUND_NONE : FOUND_PARTIAL;
+ //Justin add 20110304 Begin
+#endif
+ //Justin add 20110304 End
+        
 }
 
 CacheBuilder::FoundState CacheBuilder::FindPhoneNumber(const UChar* chars, unsigned length, 
@@ -2564,9 +2684,17 @@ bool CacheBuilder::isFocusableText(NodeWalk* walk, bool more, Node* node,
     int baseStart, firstStart = start;
     saveInline = baseInline;
     baseStart = start;
+ //Justin add 20110304 Begin
+#ifdef FIH_RTSP_PATTERN
+    for (CachedNodeType checkType = ADDRESS_CACHEDNODETYPE;
+        checkType <= RTSP_CACHEDNODETYPE;
+        checkType = static_cast<CachedNodeType>(checkType + 1))
+#else
     for (CachedNodeType checkType = ADDRESS_CACHEDNODETYPE;
         checkType <= PHONE_CACHEDNODETYPE; 
         checkType = static_cast<CachedNodeType>(checkType + 1))
+#endif
+ //Justin add 20110304 End
     {
         if ((1 << (checkType - 1) & mAllowableTypes) == 0)
             continue;
@@ -2600,6 +2728,13 @@ bool CacheBuilder::isFocusableText(NodeWalk* walk, bool more, Node* node,
                     case PHONE_CACHEDNODETYPE:
                         state = FindPartialNumber(chars, length, &findState);
                     break;
+ //Justin add 20110304 Begin    
+#ifdef FIH_RTSP_PATTERN
+                    case RTSP_CACHEDNODETYPE:
+                        state = FindPartialRTSP(chars, length, &findState);
+                    break;
+#endif
+ //Justin add 20110304 End
                     default:
                         ASSERT(0);
                 }

@@ -55,7 +55,8 @@ int main(int argc, char **argv)
         fscanf(f, "%*[^\n]\n");
         while (fscanf(f, "%63s%X%*X%*X%*d%*u%*d%X%*d%*u%*u\n",
                       device, address, netmask) == 3) {
-            if (strcmp(argv[1], device)) {
+            //if (strcmp(argv[1], device)) {
+            if (strcmp("usb0", device) && strcmp(argv[1], device)) {//Div6-D1-JL-TetheringPorting* avoid route IP from ppp0->usb0
                 uint32_t bit = ntohl(*netmask);
                 bit = htonl(bit ^ (1 << 31 | bit >> 1));
                 if (bit) {

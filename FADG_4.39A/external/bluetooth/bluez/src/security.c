@@ -55,6 +55,16 @@
 #include "dbus-hci.h"
 #include "storage.h"
 #include "manager.h"
+//+++IRM.B-541 [BT]DUT cannot scan any BT devices after reject BT pairing request.
+#define LOG_TAG "Security.c"
+#include <utils/Log.h>
+
+
+
+
+static gboolean g_conn_RemoteNameReq=FALSE;
+//---IRM.B-541 [BT]DUT cannot scan any BT devices after reject BT pairing request.
+
 
 typedef enum {
 	REQ_PENDING,
@@ -649,11 +659,22 @@ static void inquiry_complete(bdaddr_t *local, uint8_t status, gboolean periodic)
 	 * but periodic inquiry is active.
 	 */
 	if (!(state & STD_INQUIRY) && !(state & PERIODIC_INQUIRY)) {
+//+++IRM.B-541 [BT]DUT cannot scan any BT devices after reject BT pairing request.
+
+		if(g_conn_RemoteNameReq)
+		{
+			g_conn_RemoteNameReq = FALSE;
+			LOGW("[Mmm]inquiry_complete ======g_conn_RemoteNameReq======= ");
+			goto ResetDiscover;
+		}
+//---IRM.B-541 [BT]DUT cannot scan any BT devices after reject BT pairing request.
+
 		state |= PERIODIC_INQUIRY;
 		adapter_set_state(adapter, state);
 		return;
 	}
 
+ResetDiscover:
 	/* reset the discover type to be able to handle D-Bus and non D-Bus
 	 * requests */
 	state &= ~STD_INQUIRY;
@@ -876,6 +897,10 @@ static inline void conn_complete(int dev, int dev_id, bdaddr_t *sba, void *ptr)
 	memset(&cp_name, 0, sizeof(cp_name));
 	bacpy(&cp_name.bdaddr, &evt->bdaddr);
 	cp_name.pscan_rep_mode = 0x02;
+//+++IRM.B-541 [BT]DUT cannot scan any BT devices after reject BT pairing request.
+
+	g_conn_RemoteNameReq=TRUE;
+//---IRM.B-541 [BT]DUT cannot scan any BT devices after reject BT pairing request.
 
 	data = hci_req_data_new(dev_id, &evt->bdaddr, OGF_LINK_CTL,
 				OCF_REMOTE_NAME_REQ,

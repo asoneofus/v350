@@ -292,7 +292,7 @@ String Console::lastWMLErrorMessage() const
     Page* page = this->page();
     if (!page)
         return String();
-
+#if ENABLE(INSPECTOR)
     const Vector<ConsoleMessage*>& consoleMessages = page->inspectorController()->consoleMessages();
     if (consoleMessages.isEmpty())
         return String();
@@ -307,8 +307,9 @@ String Console::lastWMLErrorMessage() const
 
         return message->message();
     }
-
+#endif
     return String();
+
 }
 #endif
 

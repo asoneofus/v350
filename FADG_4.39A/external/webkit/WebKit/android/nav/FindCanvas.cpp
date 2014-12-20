@@ -1,4 +1,4 @@
-/*
+ /*
  * Copyright 2008, The Android Open Source Project
  *
  * Redistribution and use in source and binary forms, with or without
@@ -34,6 +34,7 @@
 #include "SkRect.h"
 
 #include <utils/Log.h>
+#include <cutils/properties.h> //CIT Update
 
 #define INTEGER_OUTSET 2
 
@@ -71,6 +72,46 @@ void MatchInfo::set(const SkRegion& region, SkPicture* pic, int layerId) {
 
 GlyphSet::GlyphSet(const SkPaint& paint, const UChar* lower, const UChar* upper,
             size_t byteLength) {
+	/*Start CIT Update*/		
+    //get bidi propertity
+	char bidi_status[PROPERTY_VALUE_MAX] = {'\0'};
+	property_get("ro.bidi.enabled", bidi_status, NULL);
+	if((strcmp("true", bidi_status) == 0)) {
+	
+	//check if arabic string
+	bool bArStr=false;
+		for (int i=0 ; i<byteLength/2;i++) {
+			if (lower[i] >= 0x600 && lower[i]<=0x6FF) {
+			bArStr=true;
+			break;
+		}
+	}
+		if(bArStr) {
+   	mCount=byteLength/2; 
+    mLowerGlyphs = new uint16_t[mCount*2];
+	memcpy(mLowerGlyphs, lower, mCount * sizeof(uint16_t));
+    mUpperGlyphs=mLowerGlyphs+ mCount;
+	memcpy(mUpperGlyphs, upper, mCount*sizeof(uint16_t));
+		}
+		else {//not arabic
+		SkPaint clonePaint(paint);
+		clonePaint.setTextEncoding(SkPaint::kUTF16_TextEncoding);
+		mTypeface = paint.getTypeface();
+		mCount = clonePaint.textToGlyphs(lower, byteLength, NULL);
+		if (mCount > MAX_STORAGE_COUNT) {
+			mLowerGlyphs = new uint16_t[2*mCount];
+		} else {
+			mLowerGlyphs = &mStorage[0];
+		}
+		mUpperGlyphs = mLowerGlyphs + mCount;
+		int count2 = clonePaint.textToGlyphs(lower, byteLength, mLowerGlyphs);
+		SkASSERT(mCount == count2);
+		count2 = clonePaint.textToGlyphs(upper, byteLength, mUpperGlyphs);
+		SkASSERT(mCount == count2);
+		}
+	}
+	else ///*End CIT Update*/
+	{
     SkPaint clonePaint(paint);
     clonePaint.setTextEncoding(SkPaint::kUTF16_TextEncoding);
     mTypeface = paint.getTypeface();
@@ -87,6 +128,7 @@ GlyphSet::GlyphSet(const SkPaint& paint, const UChar* lower, const UChar* upper,
     SkASSERT(mCount == count2);
     count2 = clonePaint.textToGlyphs(upper, byteLength, mUpperGlyphs);
     SkASSERT(mCount == count2);
+	}
 }
 
 GlyphSet::~GlyphSet() {
@@ -146,6 +188,9 @@ FindCanvas::~FindCanvas() {
 SkRect FindCanvas::addMatchNormal(int index,
         const SkPaint& paint, int count, const uint16_t* glyphs,
         const SkScalar pos[], SkScalar y) {
+#if defined (__CIT_MULTI_LANG_BIDI)
+	return addMatchNormal_CIT(index, paint, count, glyphs, pos, y);
+#endif
     const uint16_t* lineStart = glyphs - index;
     /* Use the original paint, since "text" is in glyphs */
     SkScalar before = paint.measureText(lineStart, index * sizeof(uint16_t), 0);
@@ -168,6 +213,39 @@ SkRect FindCanvas::addMatchNormal(int index,
     canvas->restoreToCount(saveCount);
     return rect;
 }
+#if defined (__CIT_MULTI_LANG_BIDI)
+// Each version of addMatch returns a rectangle for a match.
+// Not all of the parameters are used by each version.
+SkRect FindCanvas::addMatchNormal_CIT(int index,
+        const SkPaint& paint, int count, const uint16_t* glyphs,
+        const SkScalar pos[], SkScalar y) {
+    const uint16_t* lineStart = glyphs - index;
+    /* Use the original paint, since "text" is in glyphs */
+    SkScalar before = paint.measureText(lineStart, index * sizeof(uint16_t), 0);
+    SkRect rect;
+	int total = mTotalChars - index;
+	 SkScalar afterText = paint.measureText(glyphs, total * sizeof(uint16_t)); //cit update
+	 rect.fRight = pos[0] + afterText;
+   int countInBytes = count * sizeof(uint16_t);
+    //rect.fRight = paint.measureText(glyphs, countInBytes, 0) + rect.fLeft;
+	int fLeft = rect.fRight -  paint.measureText(glyphs, countInBytes, 0);
+	rect.fLeft = fLeft;
+    SkPaint::FontMetrics fontMetrics;
+    paint.getFontMetrics(&fontMetrics);
+    SkScalar baseline = y;
+    rect.fTop = baseline + fontMetrics.fAscent;
+    rect.fBottom = baseline + fontMetrics.fDescent;
+    const SkMatrix& matrix = getTotalMatrix();
+    matrix.mapRect(&rect);
+    // Add the text to our picture.
+    SkCanvas* canvas = getWorkingCanvas();
+    int saveCount = canvas->save();
+    canvas->concat(matrix);
+    canvas->drawText(glyphs, countInBytes, fLeft/*pos[0] + before*/, y, paint);
+    canvas->restoreToCount(saveCount);
+    return rect;
+}
+#endif
 
 SkRect FindCanvas::addMatchPos(int index,
         const SkPaint& paint, int count, const uint16_t* glyphs,
@@ -294,6 +372,9 @@ void FindCanvas::findHelper(const void* text, size_t byteLength,
     GlyphSet* glyphSet = getGlyphs(paint);
     const int count = glyphSet->getCount();
     int numCharacters = byteLength >> 1;
+#if defined (__CIT_MULTI_LANG_BIDI)
+	mTotalChars = numCharacters;
+#endif
     const uint16_t* chars = (const uint16_t*) text;
     // This block will check to see if we are continuing from another line.  If
     // so, the user needs to have added a space, which we do not draw.

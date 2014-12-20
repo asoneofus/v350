@@ -3,7 +3,7 @@
  *  BlueZ - Bluetooth protocol stack for Linux
  *
  *  Copyright (C) 2007-2008  Texas Instruments, Inc.
- *  Copyright (C) 2005-2010  Marcel Holtmann <marcel@holtmann.org>
+ *  Copyright (C) 2005-2009  Marcel Holtmann <marcel@holtmann.org>
  *
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -38,7 +38,7 @@
 #include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <sys/uio.h>
-
+#include <cutils/properties.h>
 #include <bluetooth/bluetooth.h>
 #include <bluetooth/hci.h>
 #include <bluetooth/hci_lib.h>
@@ -57,7 +57,14 @@
 
 #define TI_MANUFACTURER_ID	13
 
-#define FIRMWARE_DIRECTORY	"/lib/firmware/"
+// Bluetooth, KennyChu +++
+//#define FIRMWARE_DIRECTORY	"/lib/firmware/"
+#define FIRMWARE_DIRECTORY	"/system/lib/firmware/"
+// Bluetooth, KennyChu ---
+
+/* FIH, KennyChu, 2011/07/15, IRF.B-682, store TI device id { */
+#include <fcntl.h>
+/* } FIH, KennyChu, 2011/07/15 */
 
 #define ACTION_SEND_COMMAND	1
 #define ACTION_WAIT_EVENT	2
@@ -72,7 +79,9 @@
 	(BRF_DEEP_SLEEP_OPCODE_BYTE_1 | (BRF_DEEP_SLEEP_OPCODE_BYTE_2 << 8))
 
 #define FILE_HEADER_MAGIC	0x42535442
-
+//ThomasTTLin 20111122 DP2.B-1714+++++++++++++++++++++++++++++++++++++++++++++ 
+static const char PROPERTY_BT_TURN_ON_STATUS[]    = "fih_bt_turn_on_status";
+//ThomasTTLin 20111122 DP2.B-1714---------------------------------------------
 /*
  * BRF Firmware header
  */
@@ -191,6 +200,11 @@ static const char *get_firmware_name(const uint8_t *respond)
 {
 	static char firmware_file_name[PATH_MAX] = {0};
 	uint16_t version = 0, chip = 0, min_ver = 0, maj_ver = 0;
+    /* FIH, KennyChu, 2011/07/15, IRF.B-682, store TI device id { */
+    int fd, sz;
+    char path[64] = "/misc/btdevice_id";
+    char device_id[256] = {0};
+    /* } FIH, KennyChu, 2011/07/15 */
 
 	version = MAKEWORD(respond[13], respond[14]);
 	chip =  (version & 0x7C00) >> 10;
@@ -201,6 +215,21 @@ static const char *get_firmware_name(const uint8_t *respond)
 		maj_ver |= 0x0008;
 
 	sprintf(firmware_file_name, FIRMWARE_DIRECTORY "TIInit_%d.%d.%d.bts", chip, maj_ver, min_ver);
+
+    /* FIH, KennyChu, 2011/07/15, IRF.B-682, store TI device id { */
+    fd = open(path, O_WRONLY);
+    if (fd < 0) {
+		perror("open file error on /misc/btdevice_id");
+    }
+    else {
+        sprintf(device_id, "%d.%d.%d", chip, maj_ver, min_ver);
+        sz = write(fd, device_id, strlen(device_id));
+        if (sz < 0) {
+            perror("write file error on /misc/btdevice_id");    
+        }
+        close(fd);
+    }
+    /* } FIH, KennyChu, 2011/07/15 */
 
 	return firmware_file_name;
 }
@@ -269,7 +298,7 @@ static int brf_send_command_socket(int fd, struct bts_action_send* send_action)
 
 static int brf_send_command_file(int fd, struct bts_action_send* send_action, long size)
 {
-	unsigned char response[1024] = {0};
+	//unsigned char response[1024] = {0};
 	long ret = 0;
 
 	/* send command */
@@ -279,21 +308,38 @@ static int brf_send_command_file(int fd, struct bts_action_send* send_action, lo
 	}
 
 	/* read response */
-	ret = read_hci_event(fd, response, sizeof(response));
-	if (ret < 0) {
-		perror("texas: failed to read command response");
-		return -1;
-	}
+	//ret = read_hci_event(fd, response, sizeof(response));
+	//if (ret < 0) {
+	//	perror("texas: failed to read command response");
+	//	return -1;
+	//}
 
 	/* verify success */
-	if (ret < 7 || 0 != response[6]) {
-		fprintf( stderr, "TI init command failed.\n" );
-		errno = EIO;
-		return -1;
-	}
+	//if (ret < 7 || 0 != response[6]) {
+	//	fprintf( stderr, "TI init command failed.\n" );
+	//	errno = EIO;
+	//	return -1;
+	//}
 
 	return 0;
 }
+
+static int brf_read_command(int fd, struct bts_action_send* send_action, long size, int hcill_installed)
+{
+    int ret = 0;
+    unsigned char response[1024] = {0};
+
+    /* Do not read data from the HCI socket interface */
+    if (hcill_installed) {
+        ret = 0;
+    } else {
+        ret = read_hci_event(fd, response, sizeof(response));
+    }
+
+    return ret;
+}
+
+
 
 
 static int brf_send_command(int fd, struct bts_action_send* send_action, long size, int hcill_installed)
@@ -323,6 +369,7 @@ static int brf_do_action(uint16_t brf_type, uint8_t *brf_action, long brf_size,
 		ret = brf_send_command(fd, (struct bts_action_send*) brf_action, brf_size, hcill_installed);
 		break;
 	case ACTION_WAIT_EVENT:
+		ret = brf_read_command(fd, (struct bts_action_send*) brf_action, brf_size, hcill_installed);
 		DPRINTF("R");
 		break;
 	case ACTION_SERIAL:
@@ -423,15 +470,25 @@ static int brf_do_script(int fd, struct termios *ti, const char *bts_file)
 		/* if this is the first time we run (no HCILL yet) */
 		/* and a deep sleep command is encountered */
 		/* we exit */
+/* FIH, KennyChu, 2011/03/21, DMQ.B-1517, add BT deep sleep scheme{ */
+        /*
 		if (!hcill_installed &&
 				brf_action_is_deep_sleep(brf_action,
 							brf_size, brf_type))
 			return 0;
+        */
+/* } FIH, KennyChu, 2011/03/21 */
+        
 	}
 
 	bts_unload_script(brf_script_file);
 	brf_script_file = NULL;
 	DPRINTF("\n");
+	
+	//DP2.B-1714 ThomasTTLin 20111122++++++++++++++++++++++++++++++++++++
+	property_set(PROPERTY_BT_TURN_ON_STATUS, "on");
+	//DP2.B-1714 ThomasTTLin 20111122------------------------------------
+
 
 	return ret;
 }
@@ -446,7 +503,7 @@ int texas_init(int fd, struct termios *ti)
 
 	memset(resp,'\0', 100);
 
-	/* It is possible to get software version with manufacturer specific
+	/* It is possible to get software version with manufacturer specific 
 	   HCI command HCI_VS_TI_Version_Number. But the only thing you get more
 	   is if this is point-to-point or point-to-multipoint module */
 

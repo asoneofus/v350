@@ -154,3 +154,10 @@
 #undef catch
 #endif
 
+//Justin add 20110304 Bdgin
+/* RTSP for China Telecom */
+#define FIH_RTSP_PATTERN
+
+/* Phone Number for China Telecom */
+#define FIH_PHONE_NUMBER_PATTERN
+//Justin add 20110304 End

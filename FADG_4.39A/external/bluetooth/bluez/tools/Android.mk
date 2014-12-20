@@ -71,8 +71,8 @@ LOCAL_SHARED_LIBRARIES := \
 	libbluetoothd libbluetooth
 
 LOCAL_MODULE_PATH := $(TARGET_OUT_OPTIONAL_EXECUTABLES)
-LOCAL_MODULE_TAGS := eng
-LOCAL_MODULE:=hciconfig
+LOCAL_MODULE := hciconfig
+LOCAL_MODULE_TAGS := eng user
 
 include $(BUILD_EXECUTABLE)
 
@@ -97,8 +97,8 @@ LOCAL_SHARED_LIBRARIES := \
 	libbluetoothd libbluetooth
 
 LOCAL_MODULE_PATH := $(TARGET_OUT_OPTIONAL_EXECUTABLES)
-LOCAL_MODULE_TAGS := eng
-LOCAL_MODULE:=hcitool
+LOCAL_MODULE := hcitool
+LOCAL_MODULE_TAGS := eng user
 
 include $(BUILD_EXECUTABLE)
 
@@ -119,8 +119,8 @@ LOCAL_SHARED_LIBRARIES := \
 	libbluetoothd libbluetooth
 
 LOCAL_MODULE_PATH := $(TARGET_OUT_OPTIONAL_EXECUTABLES)
-LOCAL_MODULE_TAGS := eng
-LOCAL_MODULE:=l2ping
+LOCAL_MODULE := l2ping
+LOCAL_MODULE_TAGS := eng user
 
 include $(BUILD_EXECUTABLE)
 
@@ -145,9 +145,9 @@ LOCAL_C_INCLUDES:=\
 	$(LOCAL_PATH)/../src \
 
 LOCAL_SHARED_LIBRARIES := \
-	libbluetoothd libbluetooth
+	libbluetoothd libbluetooth libcutils
 
-LOCAL_MODULE:=hciattach
+LOCAL_MODULE := hciattach
 
 include $(BUILD_EXECUTABLE)
 
@@ -176,7 +176,6 @@ LOCAL_SHARED_LIBRARIES := \
         libbluetooth
 
 LOCAL_MODULE_PATH := $(TARGET_OUT_OPTIONAL_EXECUTABLES)
-LOCAL_MODULE_TAGS := eng
-LOCAL_MODULE:=rfcomm
+LOCAL_MODULE := rfcomm
 
 include $(BUILD_EXECUTABLE)

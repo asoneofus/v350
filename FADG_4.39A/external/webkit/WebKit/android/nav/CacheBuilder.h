@@ -33,8 +33,9 @@
 #include "TextDirection.h"
 #include "wtf/Vector.h"
 
-#define NAVIGATION_MAX_PHONE_LENGTH 14
-
+ //Justin add 20110304 Begin
+#define NAVIGATION_MAX_PHONE_LENGTH 32
+ //Justin add 20110304 End
 using namespace WebCore;
 
 namespace WebCore {
@@ -226,6 +227,11 @@ private:
     static FoundState FindPartialAddress(const UChar* , const UChar* , unsigned length, FindState* );
     static FoundState FindPartialEMail(const UChar* , unsigned length, FindState* );
     static FoundState FindPartialNumber(const UChar* , unsigned length, FindState* );
+ //Justin add 20110304 Begin
+#ifdef FIH_RTSP_PATTERN
+    static FoundState FindPartialRTSP(const UChar* , unsigned length, FindState* );
+#endif
+ //Justin add 20110304 End
     static FoundState FindPhoneNumber(const UChar* chars, unsigned length, int* start, int* end);
     static void FindReset(FindState* );
     static void FindResetNumber(FindState* );
