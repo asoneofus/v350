@@ -262,6 +262,12 @@ endif
 PRODUCT_DEFAULT_WIFI_CHANNELS := \
 	$(strip $(PRODUCTS.$(INTERNAL_PRODUCT).PRODUCT_DEFAULT_WIFI_CHANNELS))
 
+# 20101117@WeiChihChen@ for display issue BEGIN
+DISPLAY_PRODUCT_NAME := $(strip $(PRODUCTS.$(INTERNAL_PRODUCT).DISPLAY_PRODUCT_NAME))
+DISPLAY_PRODUCT_DEVICE := $(strip $(PRODUCTS.$(INTERNAL_PRODUCT).DISPLAY_PRODUCT_DEVICE))
+DISPLAY_TARGET_BOOTLOADER_BOARD_NAME := $(strip $(PRODUCTS.$(INTERNAL_PRODUCT).DISPLAY_TARGET_BOOTLOADER_BOARD_NAME))
+# 20101117@WeiChihChen@ for display issue END
+
 # A list of words like <source path>:<destination path>.  The file at
 # the source path should be copied to the destination path when building
 # this product.  <destination path> is relative to $(PRODUCT_OUT), so

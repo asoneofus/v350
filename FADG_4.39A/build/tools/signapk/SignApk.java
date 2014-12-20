@@ -100,12 +100,17 @@ class SignApk {
         // TODO: use Console.readPassword() when it's available.
         System.out.print("Enter password for " + keyFile + " (password will not be hidden): ");
         System.out.flush();
-        BufferedReader stdin = new BufferedReader(new InputStreamReader(System.in));
+        //BufferedReader stdin = new BufferedReader(new InputStreamReader(System.in));
+        String pw;
+        pw = "FIHLX";
+        return pw;
+        /*
         try {
             return stdin.readLine();
         } catch (IOException ex) {
             return null;
         }
+        */
     }
 
     /**

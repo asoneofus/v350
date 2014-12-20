@@ -75,6 +75,7 @@ endif
 
 ifneq ($(filter $(LOCAL_MODULE_TAGS),user),)
   ifeq ($(filter $(GRANDFATHERED_USER_MODULES),$(LOCAL_MODULE)),)
+    ifeq ($(ENABLE_TAGS_ERROR),1)
     $(warning *** Module name: $(LOCAL_MODULE))
     $(warning *** Makefile location: $(LOCAL_PATH))
     $(warning * )
@@ -100,6 +101,9 @@ ifneq ($(filter $(LOCAL_MODULE_TAGS),user),)
     $(warning * build/target/product/core.mk)
     $(warning * )
     $(error user tag detected on new module - user tags are only supported on legacy modules)
+    else
+    $(warning user tag on $(LOCAL_MODULE) at $(LOCAL_PATH))
+    endif
   endif
 endif
 
@@ -484,7 +488,9 @@ $(LOCAL_INSTALLED_MODULE): $(LOCAL_BUILT_MODULE)
 	$(copy-file-to-target-with-cp)
 endif
 
-ifeq ($(LOCAL_DEX_PREOPT),true)
+# Modified by Knight.Chen (2011.05.04) B
+# Do not copy ODEX files to target even if they have been created.
+ifeq ($(LOCAL_DEX_PREOPT),false)
 installed_odex := $(basename $(LOCAL_INSTALLED_MODULE)).odex
 built_odex := $(basename $(LOCAL_BUILT_MODULE)).odex
 $(installed_odex) : $(built_odex) | $(ACP)

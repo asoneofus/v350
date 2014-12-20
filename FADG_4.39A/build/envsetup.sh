@@ -146,8 +146,19 @@ function printconfig()
     get_build_var report_config
 }
 
+#WeiChihChen@20110905@speedup choosecombo by skipping dulicated set_stuff_for_environment
+FROM_CHOOSECOMBO=0
+#WeiChihChen@20110905@speedup choosecombo by skipping dulicated set_stuff_for_environment
+
 function set_stuff_for_environment()
 {
+#WeiChihChen@20110905@speedup choosecombo by skipping dulicated set_stuff_for_environment
+    if [ "$FROM_CHOOSECOMBO" = "1" ] ; then
+        #echo "skip duplicated set_stuff_for_environment"
+        return
+    fi
+#WeiChihChen@20110905@speedup choosecombo by skipping dulicated set_stuff_for_environment
+
     settitle
     set_java_home
     setpaths
@@ -301,13 +312,39 @@ function choosetype()
 }
 
 #
-# This function isn't really right:  It chooses a TARGET_PRODUCT
-# based on the list of boards.  Usually, that gets you something
-# that kinda works with a generic product, but really, you should
-# pick a product by name.
+# This function chooses a TARGET_PRODUCT by picking a product by name.
+# It finds the list of products by finding all the AndroidProducts.mk
+# files and looking for the product specific filenames in them.
 #
+
 function chooseproduct()
 {
+# Find the list of all products by looking for all AndroidProducts.mk files under the
+# device/, vendor/ and build/target/product/ directories and look for the format
+# LOCAL_DIR/<ProductSpecificFile.mk> and extract the name ProductSpecificFile from it.
+# This will give the list of all products that can be built using choosecombo
+
+    local -a prodlist
+
+# Find all AndroidProducts.mk files under the dirs device/, build/target/  and vendor/
+# Extract lines containing .mk from them
+# Extract lines containing LOCAL_DIR
+# Extract the name of the product specific file
+
+    prodlist=(`/usr/bin/find device/ build/target/ vendor/ -name AndroidProducts.mk 2>/dev/null|
+    xargs grep -h \.mk|
+    grep LOCAL_DIR|
+    cut -d'/' -f2|cut -d' ' -f1|sort|uniq|cut -d'.' -f1`)
+
+    local index=1
+    local p
+    echo "Product choices are:"
+    for p in ${prodlist[@]}
+    do
+        echo "     $index. $p"
+        let "index = $index + 1"
+    done
+
     if [ "x$TARGET_PRODUCT" != x ] ; then
         default_value=$TARGET_PRODUCT
     else
@@ -322,6 +359,7 @@ function chooseproduct()
     local ANSWER
     while [ -z "$TARGET_PRODUCT" ]
     do
+        echo "You can also type the name of a product if you know it."
         echo -n "Which product would you like? [$default_value] "
         if [ -z "$1" ] ; then
             read ANSWER
@@ -332,6 +370,13 @@ function chooseproduct()
 
         if [ -z "$ANSWER" ] ; then
             export TARGET_PRODUCT=$default_value
+        elif (echo -n $ANSWER | grep -q -e "^[0-9][0-9]*$") ; then
+            local poo=`echo -n $ANSWER`
+            if [ $poo -le ${#prodlist[@]} ] ; then
+                export TARGET_PRODUCT=${prodlist[$(($ANSWER-$_arrayoffset))]}
+            else
+                echo "** Bad product selection: $ANSWER"
+            fi
         else
             if check_product $ANSWER
             then
@@ -397,6 +442,9 @@ function choosevariant()
 
 function choosecombo()
 {
+#WeiChihChen@20110905@speedup choosecombo by skipping dulicated set_stuff_for_environment
+FROM_CHOOSECOMBO=1
+#WeiChihChen@20110905@speedup choosecombo by skipping dulicated set_stuff_for_environment
     choosesim $1
 
     echo
@@ -412,6 +460,9 @@ function choosecombo()
     choosevariant $4
 
     echo
+#WeiChihChen@20110905@speedup choosecombo by skipping dulicated set_stuff_for_environment
+FROM_CHOOSECOMBO=0
+#WeiChihChen@20110905@speedup choosecombo by skipping dulicated set_stuff_for_environment
     set_stuff_for_environment
     printconfig
 }

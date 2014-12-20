@@ -27,13 +27,13 @@ endif
 
 # $(1): the .jar or .apk to remove classes.dex
 define dexpreopt-remove-classes.dex
-$(hide) $(AAPT) remove $(1) classes.dex
+ $(AAPT) remove $(1) classes.dex
 endef
 
 # $(1): the input .jar or .apk file
 # $(2): the output .odex file
 define dexpreopt-one-file
-$(hide) $(DEXPREOPT) --dexopt=$(DEXPREOPT_DEXOPT) --build-dir=$(DEXPREOPT_BUILD_DIR) \
+ $(DEXPREOPT) --dexopt=$(DEXPREOPT_DEXOPT) --build-dir=$(DEXPREOPT_BUILD_DIR) \
 	--product-dir=$(DEXPREOPT_PRODUCT_DIR) --boot-dir=$(DEXPREOPT_BOOT_JAR_DIR) \
 	--boot-jars=$(DEXPREOPT_BOOT_JARS) $(DEXPREOPT_UNIPROCESSOR) \
 	$(patsubst $(DEXPREOPT_BUILD_DIR)/%,%,$(1)) \
@@ -49,15 +49,18 @@ $(eval _dbj_src_jar := $(call intermediates-dir-for,JAVA_LIBRARIES,$(1),,COMMON)
 $(eval $(_dbj_odex): PRIVATE_DBJ_JAR := $(_dbj_jar))
 $(_dbj_odex) : $(_dbj_src_jar) | $(ACP) $(DEXPREOPT) $(DEXOPT)
 	@echo "Dexpreopt Boot Jar: $$@"
-	$(hide) rm -f $$@
-	$(hide) mkdir -p $$(dir $$@)
-	$(hide) $(ACP) -fpt $$< $$(PRIVATE_DBJ_JAR)
+	$(info $(_dbj_src_jar) | $(ACP) $(DEXPREOPT) $(DEXOPT))
+	
+	 rm -f $$@
+	 mkdir -p $$(dir $$@)
+	 $(ACP) -fpt $$< $$(PRIVATE_DBJ_JAR)
 	$$(call dexpreopt-one-file,$$(PRIVATE_DBJ_JAR),$$@)
 
+# Modified by Knight.Chen (2011.05.04) B
 $(_dbj_jar_no_dex) : $(_dbj_src_jar) | $(ACP) $(AAPT)
 	$$(call copy-file-to-target)
-	$$(call dexpreopt-remove-classes.dex,$$@)
-
+#	$$(call dexpreopt-remove-classes.dex,$$@)
+# Modified by Knight.Chen (2011.05.04) E
 $(eval _dbj_jar :=)
 $(eval _dbj_odex :=)
 $(eval _dbj_src_jar :=)
@@ -68,6 +71,7 @@ $(foreach b,$(DEXPREOPT_BOOT_JARS_MODULES),$(eval $(call _dexpreopt-boot-jar,$(b
 # $(1): the rest list of boot jars
 define _build-dexpreopt-boot-jar-dependency-pair
 $(if $(filter 1,$(words $(1)))$(filter 0,$(words $(1))),,\
+$(info _bdbjdp_target := $(DEXPREOPT_BOOT_JAR_DIR_FULL_PATH)/$(word 2,$(1)).odex) \
 	$(eval _bdbjdp_target := $(DEXPREOPT_BOOT_JAR_DIR_FULL_PATH)/$(word 2,$(1)).odex) \
 	$(eval _bdbjdp_dep := $(DEXPREOPT_BOOT_JAR_DIR_FULL_PATH)/$(word 1,$(1)).odex) \
 	$(eval $(call add-dependency,$(_bdbjdp_target),$(_bdbjdp_dep))) \

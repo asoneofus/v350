@@ -87,9 +87,11 @@ FRAMEWORKS_BASE_SUBDIRS := \
 	    telephony \
 	    wifi \
 	    vpn \
+		fihtdc \
 	    keystore \
 	    voip \
 	 )
+
 
 #
 # A version of FRAMEWORKS_BASE_SUBDIRS that is expanded to full paths from

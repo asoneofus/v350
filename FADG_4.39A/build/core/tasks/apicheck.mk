@@ -32,7 +32,9 @@ ifneq ($(BUILD_TINY_ANDROID), true)
 define check-api
 $(TARGET_OUT_COMMON_INTERMEDIATES)/PACKAGING/$(strip $(1))-timestamp: $(2) $(3) $(APICHECK)
 	@echo "Checking API:" $(1)
-	$(hide) ( $(APICHECK) $(4) $(2) $(3) || ( $(5) ; exit 38 ) )
+#	$(hide) ( $(APICHECK) $(4) $(2) $(3) || ( $(5) ; exit 38 ) )
+# WeiChihChen@20111004@always exit 0 even checking failed
+	$(hide) ( $(APICHECK) $(4) $(2) $(3) || ( $(5) ; exit 0 ) )
 	$(hide) mkdir -p $$(dir $$@)
 	$(hide) touch $$@
 checkapi: $(TARGET_OUT_COMMON_INTERMEDIATES)/PACKAGING/$(strip $(1))-timestamp

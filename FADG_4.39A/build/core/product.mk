@@ -81,6 +81,13 @@ _product_var_list := \
     PRODUCT_SDK_ADDON_DOC_MODULE \
     PRODUCT_DEFAULT_WIFI_CHANNELS
 
+# 20101117@WeiChihChen@ for display issue BEGIN
+_product_var_list += \
+    DISPLAY_PRODUCT_NAME \
+    DISPLAY_PRODUCT_DEVICE \
+    DISPLAY_TARGET_BOOTLOADER_BOARD_NAME
+# 20101117@WeiChihChen@ for display issue END
+
 define dump-product
 $(info ==== $(1) ====)\
 $(foreach v,$(_product_var_list),\

@@ -83,11 +83,12 @@ $(built_odex) : $(common_javalib.jar) | $(DEXPREOPT) $(DEXOPT)
 	@echo "Dexpreopt Jar: $(PRIVATE_MODULE) ($@)"
 	$(hide) rm -f $@
 	$(call dexpreopt-one-file,$<,$@)
-
+# Modified by Knight.Chen (2011.05.04) B
 $(LOCAL_BUILT_MODULE) : $(common_javalib.jar) | $(ACP) $(AAPT)
 	$(call copy-file-to-target)
-	$(call dexpreopt-remove-classes.dex,$@)
-
+# Do not remove classes.dex from APK file.
+#	$(call dexpreopt-remove-classes.dex,$@)
+# Modified by Knight.Chen (2011.05.04) E
 endif # dexpreopt_boot_jar_module
 
 else # LOCAL_DEX_PREOPT

@@ -4,4 +4,9 @@
 # interpreter loop for Dalvik.
 #
 include $(BUILD_COMBOS)/arch/arm/armv5te.mk
+ARCH_ARM_HAVE_VFP               := true
+
+arch_variant_cflags += \
+    -mfpu=vfp \
+    -mfloat-abi=softfp
 

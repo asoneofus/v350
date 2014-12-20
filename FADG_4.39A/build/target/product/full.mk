@@ -20,12 +20,12 @@
 # in inherited configurations.
 
 PRODUCT_PACKAGES := \
-    OpenWnn \
-    PinyinIME \
     VoiceDialer \
-    libWnnEngDic \
-    libWnnJpnDic \
-    libwnndict
+#    OpenWnn \
+#    PinyinIME \
+#    libWnnEngDic \
+#    libWnnJpnDic \
+#    libwnndict
 
 # Additional settings used in all AOSP builds
 PRODUCT_PROPERTY_OVERRIDES := \
@@ -57,3 +57,5 @@ PRODUCT_NAME := full
 PRODUCT_BRAND := generic
 PRODUCT_DEVICE := generic
 PRODUCT_MODEL := Full Android
+
+

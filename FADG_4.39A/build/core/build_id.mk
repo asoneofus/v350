@@ -18,5 +18,8 @@
 # (like "MAIN") or a branch name and a release candidate
 # (like "CRB01").  It must be a single word, and is
 # capitalized by convention.
-
+ifdef MOTO_BUILD_ID
+export BUILD_ID := $(MOTO_BUILD_ID)
+else
 export BUILD_ID=GWK74
+endif

@@ -16,15 +16,15 @@ ifneq ($(LOCAL_PREBUILT_JAVA_LIBRARIES),)
 $(error dont use LOCAL_PREBUILT_JAVA_LIBRARIES anymore LOCAL_PATH=$(LOCAL_PATH))
 endif
 
-ifneq ($(filter APPS,$(LOCAL_MODULE_CLASS)),)
-ifeq (true,$(WITH_DEXPREOPT))
-ifeq (,$(TARGET_BUILD_APPS))
-ifndef LOCAL_DEX_PREOPT
-LOCAL_DEX_PREOPT := true
+#Mex add for shared code
+ifeq ($(TARGET_BOARD_PLATFORM),tegra)
+# Prebuilt shared objects also need to go into the flat intermediate directory
+# for linking purposes
+ifneq ($(filter SHARED_LIBRARIES,$(LOCAL_MODULE_CLASS)),)
+OVERRIDE_BUILT_MODULE_PATH := $(TARGET_OUT_INTERMEDIATE_LIBRARIES)
 endif
 endif
-endif
-endif
+#Mex end for shared code
 
 include $(BUILD_SYSTEM)/base_rules.mk
 
@@ -38,22 +38,37 @@ endif
 
 PACKAGES.$(LOCAL_MODULE).OVERRIDES := $(strip $(LOCAL_OVERRIDES_PACKAGES))
 
+# Added by Knight.Chen (2011.05.04) B
+private_key := $(SRC_TARGET_DIR)/product/security/$(LOCAL_CERTIFICATE).pk8
+certificate := $(SRC_TARGET_DIR)/product/security/$(LOCAL_CERTIFICATE).x509.pem
+
+# Concate APK Certificate List.
+ifneq ($(filter APPS,$(LOCAL_MODULE_CLASS)),)
+    ifeq ($(LOCAL_CERTIFICATE),PRESIGNED)
+        TMP_APKCERT := $(LOCAL_MODULE):$(LOCAL_CERTIFICATE)
+    else
+        TMP_APKCERT := $(LOCAL_MODULE):$(certificate):$(private_key)
+    endif
+endif
+
+#$(info "TMP_APKCERT: $(TMP_APKCERT)")
+APKCERT_LIST += $(TMP_APKCERT)
+# Added by Knight.Chen (2011.05.04) E
+
+ifeq ($(LOCAL_IS_HOST_MODULE)$(LOCAL_MODULE_CLASS),JAVA_LIBRARIES)
+# for target java libraries, the LOCAL_BUILT_MODULE is in a product-specific dir,
+# while the deps should be in the common dir, so we make a copy in the common dir.
+$(info copy $(ACP) $(LOCAL_PATH)/$(LOCAL_SRC_FILES))
+common_library_jar := $(call intermediates-dir-for,JAVA_LIBRARIES,$(LOCAL_MODULE),,COMMON)/$(notdir $(LOCAL_BUILT_MODULE))
+$(common_library_jar) : $(LOCAL_PATH)/$(LOCAL_SRC_FILES) | $(ACP)
+
+	$(transform-prebuilt-to-target)
+endif
+
 # Ensure that prebuilt .apks have been aligned.
 ifneq ($(filter APPS,$(LOCAL_MODULE_CLASS)),)
-ifeq ($(LOCAL_DEX_PREOPT),true)
-# Make sure the boot jars get dexpreopt-ed first
-$(LOCAL_BUILT_MODULE): $(DEXPREOPT_BOOT_ODEXS) | $(DEXPREOPT) $(DEXOPT) $(AAPT)
-endif
 $(LOCAL_BUILT_MODULE) : $(LOCAL_PATH)/$(LOCAL_SRC_FILES) | $(ZIPALIGN)
 	$(transform-prebuilt-to-target-with-zipalign)
-ifeq ($(LOCAL_DEX_PREOPT),true)
-	$(hide) rm -f $(patsubst %.apk,%.odex,$@)
-	$(call dexpreopt-one-file,$@,$(patsubst %.apk,%.odex,$@))
-	$(call dexpreopt-remove-classes.dex,$@)
-
-built_odex := $(basename $(LOCAL_BUILT_MODULE)).odex
-$(built_odex): $(LOCAL_BUILT_MODULE)
-endif
 else
 ifneq ($(LOCAL_PREBUILT_STRIP_COMMENTS),)
 $(LOCAL_BUILT_MODULE) : $(LOCAL_PATH)/$(LOCAL_SRC_FILES)

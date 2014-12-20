@@ -297,7 +297,8 @@ jni_shared_libraries := \
 # Secure release builds will have their packages signed after the fact,
 # so it's ok for these private keys to be in the clear.
 ifeq ($(LOCAL_CERTIFICATE),)
-    LOCAL_CERTIFICATE := testkey
+    #LOCAL_CERTIFICATE := testkey
+    LOCAL_CERTIFICATE := releasekey
 endif
 
 ifeq ($(LOCAL_CERTIFICATE),EXTERNAL)
@@ -314,6 +315,17 @@ ifeq ($(dir $(strip $(LOCAL_CERTIFICATE))),./)
 endif
 private_key := $(LOCAL_CERTIFICATE).pk8
 certificate := $(LOCAL_CERTIFICATE).x509.pem
+
+# Added by Knight.Chen (2011.05.04) B
+# Concate APK Certificate List.
+TMP_APKCERT := $(LOCAL_PACKAGE_NAME):$(certificate):$(private_key)
+#$(info "TMP_APKCERT: $(TMP_APKCERT)")
+#APKCERT_LIST += $(TMP_APKCERT)${\n}
+APKCERT_LIST += $(TMP_APKCERT)
+#APKCERT_LIST:=$(subst .pk8,.pk8${\n},$(APKCERT_LIST))
+#APKCERT_FILE:=$(PRODUCT_OUT)/system/etc/apkcerts.txt
+#$(info "APKCERT_LIST: $(APKCERT_LIST)")
+# Added by Knight.Chen (2011.05.04) E
 
 $(LOCAL_BUILT_MODULE): $(private_key) $(certificate) $(SIGNAPK_JAR)
 $(LOCAL_BUILT_MODULE): PRIVATE_PRIVATE_KEY := $(private_key)
@@ -346,10 +358,12 @@ endif
 	$(sign-package)
 	@# Alignment must happen after all other zip operations.
 	$(align-package)
-ifeq ($(LOCAL_DEX_PREOPT),true)
+# Modified by Knight.Chen (2011.05.04) B
+ifeq ($(LOCAL_DEX_PREOPT),false)    
 	$(hide) rm -f $(patsubst %.apk,%.odex,$@)
 	$(call dexpreopt-one-file,$@,$(patsubst %.apk,%.odex,$@))
 	$(call dexpreopt-remove-classes.dex,$@)
+# Modified by Knight.Chen (2011.05.04) E
 
 built_odex := $(basename $(LOCAL_BUILT_MODULE)).odex
 $(built_odex): $(LOCAL_BUILT_MODULE)

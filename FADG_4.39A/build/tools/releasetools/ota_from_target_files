@@ -66,7 +66,7 @@ import common
 import edify_generator
 
 OPTIONS = common.OPTIONS
-OPTIONS.package_key = "build/target/product/security/testkey"
+OPTIONS.package_key = "build/target/product/security/releasekey"
 OPTIONS.incremental_source = None
 OPTIONS.require_verbatim = set()
 OPTIONS.prohibit_verbatim = set(("system/build.prop",))

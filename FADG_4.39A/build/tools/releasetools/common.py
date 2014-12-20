@@ -530,10 +530,14 @@ class PasswordManager(object):
       if v:
         result[k] = v
       else:
-        while True:
-          result[k] = getpass.getpass("Enter password for %s key> "
-                                      % (k,)).strip()
-          if result[k]: break
+      #Alfred test
+#        while True:
+#          result[k] = getpass.getpass("Enter password for %s key> "
+#                                      % (k,)).strip()
+#          if result[k]: break
+        print ">>>>>PrompResult k %s" % (k,)
+        result['build/target/product/security/releasekey']='FIHLX'
+        
     return result
 
   def UpdateAndReadFile(self, current):

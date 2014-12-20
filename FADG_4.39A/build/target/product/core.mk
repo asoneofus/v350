@@ -74,7 +74,8 @@ PRODUCT_PACKAGES := \
     UserDictionaryProvider \
     PackageInstaller \
     DefaultContainerService \
-    Bugreport
+    Bugreport \
+	Stk
 
 # host-only dependencies
 ifeq ($(WITH_HOST_DALVIK),true)
