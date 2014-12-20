@@ -14,12 +14,17 @@ ifeq ($(TARGET_ARCH),sh)
 # SH-4A series virtual address range from 0x00000000 to 0x7FFFFFFF.
 LINKER_TEXT_BASE := 0x70000100
 else
+    ifneq ($(TARGET_USES_2G_VM_SPLIT),true)
 # This is aligned to 4K page boundary so that both GNU ld and gold work.  Gold
 # actually produces a correct binary with starting address 0xB0000100 but the
 # extra objcopy step to rename symbols causes the resulting binary to be misaligned
 # and unloadable.  Increasing the alignment adds an extra 3840 bytes in padding
 # but switching to gold saves about 1M of space.
-LINKER_TEXT_BASE := 0xB0001000
+        LINKER_TEXT_BASE := 0xB0001000
+    else
+        LINKER_TEXT_BASE := 0x70001000
+        LOCAL_CFLAGS += -DVM_SPLIT_2G
+    endif
 endif
 
 # The maximum size set aside for the linker, from
@@ -31,6 +36,11 @@ LOCAL_LDFLAGS := -Wl,-Ttext,$(LINKER_TEXT_BASE)
 LOCAL_CFLAGS += -DPRELINK
 LOCAL_CFLAGS += -DLINKER_TEXT_BASE=$(LINKER_TEXT_BASE)
 LOCAL_CFLAGS += -DLINKER_AREA_SIZE=$(LINKER_AREA_SIZE)
+
+ifeq ($(strip $(BUILD_WITH_HELIXPLAYER)),true)
+$(info Define BUILD_WITH_HELIXPLAYER local C flag in bionic linker.)
+LOCAL_CFLAGS += -DBUILD_WITH_HELIXPLAYER
+endif
 
 # Set LINKER_DEBUG to either 1 or 0
 #

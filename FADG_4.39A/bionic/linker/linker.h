@@ -159,6 +159,10 @@ extern soinfo libdl_info;
 #define LIBBASE 0x60000000
 #define LIBLAST 0x70000000
 #define LIBINC  0x00100000
+#elif defined(VM_SPLIT_2G)
+#define LIBBASE 0x10000000
+#define LIBLAST 0x20000000
+#define LIBINC  0x00100000
 #else
 #define LIBBASE 0x80000000
 #define LIBLAST 0x90000000

@@ -53,8 +53,14 @@
 #include "ba.h"
 
 #define ALLOW_SYMBOLS_FROM_MAIN 1
-#define SO_MAX 96
-
+//+ FihtdcCode@20110816 EricCKHwang for SFC real integration
+#ifdef BUILD_WITH_HELIXPLAYER
+   #define SO_MAX 256
+#else
+   //#define SO_MAX 96 //IRM.B-1198 [Force close_crash][FQC]DUT happen force close_crash when access GPS test at FQC. library load fail.fih_misty_20110915
+   #define SO_MAX 128
+#endif
+//- FihtdcCode@20110816 EricCKHwang for SFC real integration
 /* Assume average path length of 64 and max 8 paths */
 #define LDPATH_BUFSIZE 512
 #define LDPATH_MAX 8

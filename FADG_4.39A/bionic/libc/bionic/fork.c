@@ -51,7 +51,8 @@ int  fork(void)
          * the current task id and add it to the uid group passed
          * as a parameter.
          */
-        cpuacct_add(getuid());
+//2011217@brianlee: this cause MonkeyEvts consumed slowly problem, disable this on Ginger for now
+//        cpuacct_add(getuid());
     }
     return ret;
 }
