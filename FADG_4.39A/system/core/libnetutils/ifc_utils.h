@@ -32,4 +32,8 @@ int ifc_create_default_route(const char *name, unsigned addr);
 
 int ifc_get_info(const char *name, unsigned *addr, unsigned *mask, unsigned *flags);
 
+///+ FIH: [DMQ.F-503] Configurable MTU based on MCC/MNC, Susan Chiu, 2011/1/12
+int ifc_set_mtu(const char *ifname, int mtu_size);
+///- FIH: End [DMQ.F-503]
+
 #endif

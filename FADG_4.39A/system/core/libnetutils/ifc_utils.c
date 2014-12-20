@@ -367,10 +367,20 @@ int ifc_set_default_route(const char *ifname, in_addr_t gateway)
     ifc_init();
     addr.s_addr = gateway;
     if ((result = ifc_create_default_route(ifname, gateway)) < 0) {
-        LOGD("failed to add %s as default route for %s: %s",
-             inet_ntoa(addr), ifname, strerror(errno));
+        LOGD("failed to add %s as default route for %s: %s, result = %d",
+             inet_ntoa(addr), ifname, strerror(errno), result);
     }
     ifc_close();
+    /* {{[PFAG.B-719][Data connection] The 3G/G icon exists. However the DUT can't connect to network sometimes, PhilipWYHuang, 20110331 */
+    if(!(memcmp(ifname, "rmnet", 5))){
+        LOGD("set the %s device state to up before set default route.", ifname);
+        result = ifc_enable(ifname);
+        if (result) {
+            printerr("failed to turn on interface %s: %s, result = %d\n", ifname, strerror(errno), result);
+            return -1;
+        }
+    }
+    /* }} [PFAG.B-719] PhilipWYHuang, 20110331 */
     return result;
 }
 
@@ -436,3 +446,18 @@ ifc_configure(const char *ifname,
 
     return 0;
 }
+
+///+ FIH: [DMQ.F-503] Configurable MTU based on MCC/MNC, Susan Chiu, 2011/1/12
+/*
+ * Sets the MTU size of the named interface
+ */
+int ifc_set_mtu(const char *ifname, int mtu_size)
+{
+    struct ifreq ifr;
+
+    ifc_init_ifr(ifname, &ifr);
+    ifr.ifr_mtu = mtu_size;
+
+    return ioctl(ifc_ctl_sock, SIOCSIFMTU, &ifr);
+}
+///- FIH: End [DMQ.F-503]

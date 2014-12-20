@@ -268,6 +268,63 @@ static int create_service_thread(void (*func)(int, void *), void *cookie)
     return s[0];
 }
 
+#if !ADB_HOST
+#include "cust-md5.h"
+#define PATTERN_LEN 8 //adjustable
+#define MD5_DIGEST_LEN 16 // don't change this. It corresponds to cust-md5.h: 128-bit message-digist
+extern int secure_jdwp; // jdwp_service.c
+void secure_debugger_service(int fd, void *cookie)
+{
+	static unsigned char initPattern[PATTERN_LEN+1];
+	char message[256];
+
+	char* cmd = cookie;
+	int len = strlen(cmd);
+	if ( len == MD5_DIGEST_LEN*2 ) {
+		// compare the digest that user gave
+		unsigned char md5_result[MD5_DIGEST_LEN+1];
+		char md5_readable[MD5_DIGEST_LEN*2+1];
+		
+		CustMD5_GetMD5Pattern(initPattern, md5_result);
+		md5_result[MD5_DIGEST_LEN]=0;
+		
+		CustMD5_ToReadable(md5_result, md5_readable);
+		md5_readable[MD5_DIGEST_LEN*2]=0;
+
+		//D("secure-debugger: subCmd trying to match message-digest");
+		//D("secure-debugger: correct md should be=%s", md5_readable);
+		
+		if ( !strncmp(cmd, md5_readable, MD5_DIGEST_LEN*2) ) {
+			secure_jdwp = 1; // turn on jdwp debugger
+			snprintf(message, sizeof(message), "Secure Debugger turned on succesfully\n");
+			writex(fd,message, strlen(message));
+		} else {
+			snprintf(message, sizeof(message), "Secure Debugger turning on.. failed\n");
+			writex(fd,message, strlen(message));
+		}
+	} else if ( len == 2 && !strncmp(cmd, "up", 2)) {
+		//D("secure-debugger: subCmd = up");
+		// generate random string and remember it
+		char initReadable[PATTERN_LEN*2+1];
+
+		CustMD5_GenSrcPattern(initPattern, PATTERN_LEN);
+		initPattern[PATTERN_LEN]=0;
+		
+		CustMD5_ToReadable(initPattern, initReadable);
+	    initReadable[PATTERN_LEN*2] = 0;
+		
+		//D("secure-debugger: readable=%s", srcReadable);
+	    writex(fd, initReadable, strlen(initReadable));
+		writex(fd, "\n", 1);
+	} else {
+		snprintf(message, sizeof(message), "Secure Debugger: parameter mismatch\n");
+		writex(fd,message, strlen(message));
+	}
+	adb_close(fd);
+	free(cookie);
+}
+#endif
+
 static int create_subprocess(const char *cmd, const char *arg0, const char *arg1)
 {
 #ifdef HAVE_WIN32_PROC
@@ -277,6 +334,15 @@ static int create_subprocess(const char *cmd, const char *arg0, const char *arg1
     char *devname;
     int ptm;
     pid_t pid;
+
+#if !ADB_HOST
+	if ( arg1 != NULL && !strncmp(arg1, "secure-debugger:", 16) ) {
+		char *subCmd = malloc(strlen(arg1)-16+1);
+		strcpy(subCmd, &arg1[16]);
+		//D("secure-debugger: matching, subCmd= %s", subCmd);
+		return create_service_thread(secure_debugger_service, subCmd);
+	}
+#endif
 
     ptm = unix_open("/dev/ptmx", O_RDWR); // | O_NOCTTY);
     if(ptm < 0){

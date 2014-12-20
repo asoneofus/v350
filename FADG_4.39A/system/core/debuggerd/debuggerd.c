@@ -50,6 +50,9 @@
 #endif
 #endif
 
+/*Sandra - system crash -- reboot*/
+#include <sys/reboot.h>
+/*Sandra - system crash -- reboot*/
 /* Main entry point to get the backtrace from the crashing process */
 extern int unwind_backtrace_with_ptrace(int tfd, pid_t pid, mapinfo *map,
                                         unsigned int sp_list[],
@@ -593,7 +596,13 @@ static bool engrave_tombstone(unsigned pid, unsigned tid, int debug_uid,
 {
     int fd;
     bool need_cleanup = false;
-
+    /*Sandra - system crash -- reboot*/
+    char processFile[1024];
+    char cmdline[1024];
+    char*  systemProcessName = "system_server";
+    const char *chars = "system crash";
+    FILE* fd2 = NULL;
+    /*Sandra - system crash -- reboot*/
     mkdir(TOMBSTONE_DIR, 0755);
     chown(TOMBSTONE_DIR, AID_SYSTEM, AID_SYSTEM);
 
@@ -612,6 +621,25 @@ static bool engrave_tombstone(unsigned pid, unsigned tid, int debug_uid,
     }
 
     close(fd);
+    /*Sandra - system crash -- reboot*/
+    sprintf(processFile,"/proc/%d/cmdline",pid);
+
+    snprintf(processFile,sizeof(processFile),"/proc/%d/cmdline",pid);
+    cmdline[0] = '\0';
+    fd2 = fopen(processFile, "r");
+    if (fd2){
+        fgets(cmdline, 1024, fd2);
+        fclose(fd2);
+        if (strlen(cmdline) > 0) {
+            //LOGW("%s",cmdline);
+            if(!memcmp(systemProcessName,cmdline,13)){ 
+                //LOGW("Debuggerd: system will reboot now");
+                __reboot(LINUX_REBOOT_MAGIC1, LINUX_REBOOT_MAGIC2, LINUX_REBOOT_CMD_RESTART2, 
+                (char*) chars);
+            }
+        }
+    }
+    /*Sandra - system crash -- reboot*/
     return need_cleanup;
 }
 

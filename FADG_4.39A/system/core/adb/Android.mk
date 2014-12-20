@@ -111,6 +111,9 @@ endif
 ifeq ($(BUILD_ADBD),true)
 include $(CLEAR_VARS)
 
+LOCAL_C_INCLUDES += \
+   $(LOCAL_PATH)/inc
+
 LOCAL_SRC_FILES := \
 	adb.c \
 	fdevent.c \
@@ -125,10 +128,42 @@ LOCAL_SRC_FILES := \
 	remount_service.c \
 	usb_linux_client.c \
 	log_service.c \
+	cust-md5.c \
 	utils.c
+
+ifeq ($(QCOM_TARGET_PRODUCT),msm7630_surf)
+LOCAL_SRC_FILES := $(filter-out adb.c, $(LOCAL_SRC_FILES))
+LOCAL_SRC_FILES := $(filter-out services.c, $(LOCAL_SRC_FILES))
+LOCAL_SRC_FILES += adb_7x30.c
+LOCAL_SRC_FILES += services_7x30.c
+endif
+
+ifeq ($(QCOM_TARGET_PRODUCT),msm7627a)
+LOCAL_SRC_FILES := $(filter-out adb.c, $(LOCAL_SRC_FILES))
+LOCAL_SRC_FILES := $(filter-out services.c, $(LOCAL_SRC_FILES))
+LOCAL_SRC_FILES += adb_7x30.c
+LOCAL_SRC_FILES += services_7x30.c
+endif
+
+ifeq ($(QCOM_TARGET_PRODUCT),msm7627_surf)
+###+++ FIH;Tiger;2009/10/1 ++++
+# port ADQ.FC185
+LOCAL_SHARED_LIBRARIES := libnv liboncrpc
+###--- FIH;Tiger;2009/10/1 ---
+endif
 
 LOCAL_CFLAGS := -O2 -g -DADB_HOST=0 -Wall -Wno-unused-parameter
 LOCAL_CFLAGS += -D_XOPEN_SOURCE -D_GNU_SOURCE
+
+#WeiChihChen
+LOCAL_CFLAGS += -DCONFIG_FIH_CONFIG_GROUP
+#WeiChihChen
+
+# FIH;Tiger;2009/10/1 {
+# port ADQ.FC185
+LOCAL_CFLAGS += -DCONFIG_FIH_FXX
+# } FIH;Tiger;2009/10/1
+
 
 # TODO: This should probably be board specific, whether or not the kernel has
 # the gadget driver; rather than relying on the architecture type.
@@ -139,6 +174,11 @@ endif
 LOCAL_MODULE := adbd
 
 LOCAL_FORCE_STATIC_EXECUTABLE := true
+
+ifeq ($(QCOM_TARGET_PRODUCT),msm7627_surf)
+LOCAL_FORCE_STATIC_EXECUTABLE := false
+endif
+
 LOCAL_MODULE_PATH := $(TARGET_ROOT_OUT_SBIN)
 LOCAL_UNSTRIPPED_PATH := $(TARGET_ROOT_OUT_SBIN_UNSTRIPPED)
 

@@ -24,6 +24,16 @@
 #include <fcntl.h>
 
 #include "private/android_filesystem_config.h"
+//SW2-5-2-MP-DbgCfgTool-00+[
+//Let LOGI can be shown in release image
+#ifdef LOG_NDEBUG
+    #undef LOG_NDEBUG
+#endif
+
+#ifdef NDEBUG
+    #undef NDEBUG
+#endif
+//SW2-5-2-MP-DbgCfgTool-00+]
 #include "cutils/log.h"
 
 void fatal(const char *msg) {

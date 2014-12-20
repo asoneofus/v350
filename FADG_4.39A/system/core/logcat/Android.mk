@@ -6,6 +6,13 @@ include $(CLEAR_VARS)
 LOCAL_SRC_FILES:= logcat.cpp event.logtags
 
 LOCAL_SHARED_LIBRARIES := liblog
+LOCAL_STATIC_LIBRARIES := libcutils
+
+ifeq ($(strip $(QC_PROP)),true)
+LOCAL_SHARED_LIBRARIES += libdiag
+LOCAL_CFLAGS += -DUSE_DIAG
+LOCAL_C_INCLUDES := vendor/qcom/opensource/diag
+endif # QC_PROP
 
 LOCAL_MODULE:= logcat
 

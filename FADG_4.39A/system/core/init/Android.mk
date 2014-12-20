@@ -8,18 +8,39 @@ LOCAL_SRC_FILES:= \
 	init.c \
 	devices.c \
 	property_service.c \
+	runit.c \
 	util.c \
 	parser.c \
+	mlog.c \
 	logo.c \
 	keychords.c \
 	signal_handler.c \
 	init_parser.c \
 	ueventd.c \
-	ueventd_parser.c
+	ueventd_parser.c \
+	fih_prop_serv.c
 
 ifeq ($(strip $(INIT_BOOTCHART)),true)
 LOCAL_SRC_FILES += bootchart.c
 LOCAL_CFLAGS    += -DBOOTCHART=1
+endif
+
+#WeiChihChen@20110309@Support ext3 format of emmc data partion BEGIN
+ifeq ($(QCOM_TARGET_PRODUCT),msm7630_surf)
+    LOCAL_CFLAGS += -DEMMC_DATA_FORMAT
+endif
+#WeiChihChen@20110309@Support ext3 format of emmc data partion END
+
+ifeq ($(BOARD_HAS_BCM_CHIP), true)
+
+ifeq ($(SF8_WLAN), true)
+LOCAL_CFLAGS    += -DBROADCOM_WLAN
+endif
+
+ifeq ($(SF8_BLUETOOTH), true)
+LOCAL_CFLAGS    += -DBROADCOM_BT
+endif
+
 endif
 
 LOCAL_MODULE:= init

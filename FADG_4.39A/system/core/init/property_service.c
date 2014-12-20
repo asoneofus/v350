@@ -46,7 +46,9 @@
 #include "log.h"
 
 #define PERSISTENT_PROPERTY_DIR  "/data/property"
-
+//@PROPERTY_IN_CDA@20100622 ben begin
+#define PROP_PATH_CDA_OVERRIDE "/hidden/data/CDA/cda.prop" 
+//@PROPERTY_IN_CDA@20100622 ben end
 static int persistent_properties_loaded = 0;
 static int property_area_inited = 0;
 
@@ -59,6 +61,10 @@ struct {
     unsigned int gid;
 } property_perms[] = {
     { "net.rmnet0.",      AID_RADIO,    0 },
+///+FIH: [multiple PDP]system properties for multiple PDP, Susan Chiu, 2010/11/09
+    { "net.rmnet1.",      AID_RADIO,    0 },
+    { "net.rmnet2.",      AID_RADIO,    0 },
+///-FIH: [multiple PDP]system properties for multiple PDP, Susan Chiu,
     { "net.gprs.",        AID_RADIO,    0 },
     { "net.ppp",          AID_RADIO,    0 },
     { "ril.",             AID_RADIO,    0 },
@@ -82,6 +88,27 @@ struct {
     { "persist.sys.",     AID_SYSTEM,   0 },
     { "persist.service.", AID_SYSTEM,   0 },
     { "persist.security.", AID_SYSTEM,   0 },
+    { "persist.gsmapp.",   AID_APP,     0 },  //+FIH[DMQ.F-116], add for getting system property permisson , by FrankYu 20101108
+//WeiChihChen Add for libcamera BEGIN
+    { "libcamera.",   AID_MEDIA, 0 },
+//WeiChihChen Add for libcamera END
+	/* FIH;Tiger;2009/10/19 {, jones porting */
+	/* support gsensor calibration AP */
+    { "fih.",   AID_COMPASS },
+    { "fih.showGSensorCalib",   AID_APP },
+	/* } FIH;Tiger;2009/10/19, jones porting */
+/* Fihtdc@20101231 CGWeng, add for BT and FM{ */
+{ "fih_bt_status", AID_APP},
+{ "fih_fm_status", AID_APP},
+/* Fihtdc@20101231 CGWeng, add for BT and FM } */
+
+//IRM.B-3894 ThomasTTLin 20111122++++++++++++++++++++++++++++++++++++
+{ "fih_bt_turn_on_status", AID_APP},
+//IRM.B-3894 ThomasTTLin 20111122------------------------------------
+{ "fih_fm_turnon_bt_status", AID_APP},  // ShaunLuo @ 20110104 : DPD.B-471
+	{ "service.config.gsensor_cal",   AID_APP }, //Div2D5-OwenHuang-FB0_Gsensor_Calibration-00+
+    { "backup.wallpaper", AID_APP}, //JamesHuang-add for wallpaper backup
+    { "hw.fm.",           AID_FM_RADIO,  0 }, //WeiChihChen @ for android_hardware_fm_7630_40xx.cpp
     { NULL, 0, 0 }
 };
 
@@ -95,6 +122,7 @@ struct {
     unsigned int gid;
 } control_perms[] = {
     { "dumpstate",AID_SHELL, AID_LOG },
+    { "fm_dl", AID_FM_RADIO, AID_FM_RADIO},  //FIH, KarenLiao, 2011/01/24, DMQG.F-5: (DM-BL-9-5)FM radio. Porting DMQ/DPD FM to Gingerbread.
      {NULL, 0, 0 }
 };
 
@@ -143,10 +171,19 @@ out:
 
 /* (8 header words + 247 toc words) = 1020 bytes */
 /* 1024 bytes header and toc + 247 prop_infos @ 128 bytes = 32640 bytes */
-
-#define PA_COUNT_MAX  247
-#define PA_INFO_START 1024
-#define PA_SIZE       32768
+// Increase the max. property number +++
+//#define PA_COUNT_MAX  247
+//#define PA_INFO_START 1024
+//#define PA_SIZE       32768
+#define HEADER_WORDS_NUM    8
+#define HEADER_WORD_SIZE    4
+#define TOC_WORD_SIZE       4
+#define PROP_INFO_SIZE      128
+#define PA_COUNT_MAX  494
+#define PA_INFO_START ((HEADER_WORDS_NUM*HEADER_WORD_SIZE) + (PA_COUNT_MAX*TOC_WORD_SIZE))
+//  Round up to multiples of 32768 bytes
+#define PA_SIZE     (((PA_INFO_START + (PA_COUNT_MAX*PROP_INFO_SIZE)) + 32767)/32768)*32768
+// Increase the max. property number ---
 
 static workspace pa_workspace;
 static prop_info *pa_info_array;
@@ -239,6 +276,13 @@ static int check_perms(const char *name, unsigned int uid, unsigned int gid)
                 (gid && property_perms[i].gid == gid)) {
                 return 1;
             }
+		/* FIH;Tiger;2009/10/20 {, jones porting */
+		// open a hook for application to set property (carefully!!!)
+		// support gsensor calibration AP
+		if(property_perms[i].uid == AID_APP) {
+			return 1;
+		}
+		/* } FIH;Tiger;2009/10/20, jones porting */
         }
     }
 
@@ -516,6 +560,13 @@ void start_property_service(void)
 {
     int fd;
 
+    //@SingleImageWithCDA@BenLiao for Replace model number
+    fih_prop_serv();
+    //@PROPERTY_IN_CDA@20100622 ben begin
+    //A property¡¦s name begins with "ro.", then this property is treated as a read-only property. 
+    //Once set, the value of the property can¡¦t be changed. 
+    load_properties_from_file(PROP_PATH_CDA_OVERRIDE);
+    //@PROPERTY_IN_CDA@20100622 ben end
     load_properties_from_file(PROP_PATH_SYSTEM_BUILD);
     load_properties_from_file(PROP_PATH_SYSTEM_DEFAULT);
     load_properties_from_file(PROP_PATH_LOCAL_OVERRIDE);

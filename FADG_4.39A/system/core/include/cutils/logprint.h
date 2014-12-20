@@ -58,6 +58,8 @@ void android_log_format_free(AndroidLogFormat *p_format);
 void android_log_setPrintFormat(AndroidLogFormat *p_format, 
         AndroidLogPrintFormat format);
 
+char filterPriToChar (android_LogPriority pri); //SW2-5-1-BH-DbgCfgTool-00*
+
 /**
  * Returns FORMAT_OFF on invalid string
  */

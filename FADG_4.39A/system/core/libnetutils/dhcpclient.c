@@ -145,6 +145,12 @@ static int ifc_configure(const char *ifname, dhcp_info *info)
         return -1;
     }
 
+    /* {{[PFAG.B-40][FB0][0001][Data connection] Cannot connect to the internet but data service icon display on the notification bar, PhilipWYHuang, 20110215 */
+    #if 1
+    snprintf(dns_prop_name, sizeof(dns_prop_name), "net.%s.gw", ifname);
+    property_set(dns_prop_name, info->gateway ? ipaddr(info->gateway) : "");
+    #endif
+    /* }} [PFAG.B-40] PhilipWYHuang, 20110215 */
     snprintf(dns_prop_name, sizeof(dns_prop_name), "net.%s.dns1", ifname);
     property_set(dns_prop_name, info->dns1 ? ipaddr(info->dns1) : "");
     snprintf(dns_prop_name, sizeof(dns_prop_name), "net.%s.dns2", ifname);

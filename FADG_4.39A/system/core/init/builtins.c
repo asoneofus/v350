@@ -167,10 +167,43 @@ int do_domainname(int nargs, char **args)
     return write_file("/proc/sys/kernel/domainname", args[1]);
 }
 
+//EricCHWang open do_exec function
+//WeiChihChen@20110309@Support ext3 format of emmc data partion BEGIN
+//#ifdef EMMC_DATA_FORMAT
+/*exec <path> <arg1> <arg2> ... */
+#define MAX_PARAMETERS 64
 int do_exec(int nargs, char **args)
 {
-    return -1;
+    pid_t pid;
+    int status, i, j;
+    char *par[MAX_PARAMETERS];
+    if (nargs > MAX_PARAMETERS)
+    {
+        return -1;
+    }
+    for(i=0, j=1; i<(nargs-1) ;i++,j++)
+    {
+        par[i] = args[j];
+    }
+    par[i] = (char*)0;
+    pid = fork();
+    if (!pid)
+    {
+        execv(par[0],par);
+    }
+    else
+    {
+        while(wait(&status)!=pid);
+    }
+    return 0;
 }
+//#else
+//int do_exec(int nargs, char **args)
+//{
+//    return -1;
+//}
+//#endif //EMMC_DATA_FORMAT
+//WeiChihChen@20110309@Support ext3 format of emmc data partion END
 
 int do_export(int nargs, char **args)
 {
@@ -565,3 +598,74 @@ int do_wait(int nargs, char **args)
     }
     return -1;
 }
+
+//Div6-D1-JL-UsbPorting-00+{
+//PC-Tool
+#define BB_LOOP_SET_STATUS  0x4C02
+#define BB_LOOP_GET_STATUS  0x4C03
+typedef struct {
+    int                lo_number;
+    __kernel_dev_t     lo_device;
+    unsigned long      lo_inode;
+    __kernel_dev_t     lo_rdevice;
+    int                lo_offset;
+    int                lo_encrypt_type;
+    int                lo_encrypt_key_size;
+    int                lo_flags;
+    char               lo_file_name[LO_NAME_SIZE];
+    unsigned char      lo_encrypt_key[LO_KEY_SIZE];
+    unsigned long      lo_init[2];
+    char               reserved[4];
+} bb_loop_info;
+//Div6-D1-JL-UsbPorting-00+}
+
+//Div6-D1-JL-UsbPorting-00+{
+//PC-Tool
+static int setloop(char *device, const char *file, unsigned long long offset)
+{
+    bb_loop_info loopinfo;
+    struct stat statbuf;
+    int dfd, ffd, mode, rc = -1;
+    /* Open the file. */
+    mode = O_RDONLY;
+    ffd = open(file, mode);
+    if (ffd < 0)
+        return -errno;
+    /* Ran out of block devices, return failure.  */
+    if (stat(device, &statbuf) || !S_ISBLK(statbuf.st_mode)) {
+        return -errno;
+    }
+    /* Open the sucker and check its loopiness.  */
+    dfd = open(device, mode);
+    if (dfd < 0)
+        return -errno;
+    rc = ioctl(dfd, BB_LOOP_GET_STATUS, &loopinfo);
+    /* If device is free, claim it.  */
+    if (rc && errno == ENXIO) {
+        memset(&loopinfo, 0, sizeof(loopinfo));
+        strncpy((char *)loopinfo.lo_file_name, file, LO_NAME_SIZE);
+        loopinfo.lo_offset = offset;
+        /* Associate free loop device with file.  */
+        if (!ioctl(dfd, LOOP_SET_FD, ffd)) {
+            if (!ioctl(dfd, BB_LOOP_SET_STATUS, &loopinfo))
+                rc = 0;
+            else
+                ioctl(dfd, LOOP_CLR_FD, 0);
+        }
+    }
+    else
+        return -errno;
+    close(dfd);
+    close(ffd);
+    return rc;
+}
+
+int do_losetup(int nargs, char **args) {
+    /* max 2 args,  no option*/
+    if (nargs != 3)
+        return -1;
+    if (setloop(args[1], args[2], 0) < 0)
+        return -2;
+    return 0;
+}
+//Div6-D1-JL-UsbPorting-00+}

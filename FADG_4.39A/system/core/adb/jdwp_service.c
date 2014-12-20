@@ -108,14 +108,33 @@ struct JdwpProcess {
     int           socket;
     fdevent*      fde;
 
-    char          in_buff[4];  /* input character to read PID */
+    char          in_buff[8];  /* input character to read PID */
     int           in_len;      /* number from JDWP process    */
 
     int           out_fds[MAX_OUT_FDS]; /* output array of file descriptors */
     int           out_count;            /* to send to the JDWP process      */
+    int           jdwp_visible;
 };
 
 static JdwpProcess  _jdwp_list;
+
+int secure_jdwp = 0;
+static int jdwp_proc_visibility(JdwpProcess* proc)
+{
+	char strValue[10];
+	int value;
+
+	if ( proc->jdwp_visible == 1 ) {
+		return 1;
+	}
+#if 0	
+    property_get("debug.adb.jdwp", strValue, "0");
+	value = atoi(strValue);
+#else
+	value = secure_jdwp;
+#endif
+	return value==0 ? 0:1;
+}
 
 static int
 jdwp_process_list( char*  buffer, int  bufferlen )
@@ -130,6 +149,9 @@ jdwp_process_list( char*  buffer, int  bufferlen )
         /* skip transient connections */
         if (proc->pid < 0)
             continue;
+
+		if (jdwp_proc_visibility(proc) == 0)
+			continue;
 
         len = snprintf(p, end-p, "%d\n", proc->pid);
         if (p + len >= end)
@@ -239,8 +261,9 @@ jdwp_process_event( int  socket, unsigned  events, void*  _proc )
         if (proc->pid < 0) {
             /* read the PID as a 4-hexchar string */
             char*  p    = proc->in_buff + proc->in_len;
-            int    size = 4 - proc->in_len;
+            int    size = 8 - proc->in_len;
             char   temp[5];
+            char   temp2[5];
             while (size > 0) {
                 int  len = recv( socket, p, size, 0 );
                 if (len < 0) {
@@ -265,9 +288,15 @@ jdwp_process_event( int  socket, unsigned  events, void*  _proc )
             /* we have read 4 characters, now decode the pid */
             memcpy(temp, proc->in_buff, 4);
             temp[4] = 0;
+            memcpy(temp2, &proc->in_buff[4], 4);
+            temp2[4] = 0;
 
             if (sscanf( temp, "%04x", &proc->pid ) != 1) {
                 D("could not decode JDWP %p PID number: '%s'\n", proc, temp);
+                goto CloseProcess;
+            }
+            if (sscanf( temp2, "%04x", &proc->jdwp_visible ) != 1) {
+                D("could not decode Proc %p visibility: '%s'\n", proc, temp2);
                 goto CloseProcess;
             }
 
@@ -368,7 +397,7 @@ create_jdwp_connection_fd(int  pid)
 
     D("looking for pid %d in JDWP process list\n", pid);
     for ( ; proc != &_jdwp_list; proc = proc->next ) {
-        if (proc->pid == pid) {
+        if (proc->pid == pid && jdwp_proc_visibility(proc) == 1 ) {
             goto FoundIt;
         }
     }

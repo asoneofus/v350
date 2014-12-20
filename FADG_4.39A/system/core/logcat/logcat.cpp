@@ -20,8 +20,27 @@
 #include <sys/stat.h>
 #include <arpa/inet.h>
 
+//SW2-5-1-BH-DbgCfgTool-00+[
+#include <cutils/properties.h>
+
+#define LOG_MAIN_SD_PATH    "/sdcard/alog"
+#define LOG_RADIO_SD_PATH    "/sdcard/alog_radio"
+#define LOG_SYSTEM_SD_PATH    "/sdcard/alog_system" //SW2-5-1-MP-DbgCfgTool-05+
+#define LOG_EVENTS_SD_PATH    "/sdcard/alog_events"  //SW2-5-1-BH-EventsLog-00+
+#define FILE_NAME_LENGTH    128
+#define CMD_STRING_LENGTH    128
+
+static int flush_to_sdcard = 0;    //alog is written to SD card
+static int flush_to_flash_temporarily = 0;    //alog is written to flash temporarily before SD card ready
+
+static time_t previous_check_time = 0;
+static char g_SDFileName[FILE_NAME_LENGTH];
+static char g_SDFilePath[FILE_NAME_LENGTH];
+//SW2-5-1-BH-DbgCfgTool-00+]
+
 #define DEFAULT_LOG_ROTATE_SIZE_KBYTES 16
 #define DEFAULT_MAX_ROTATED_LOGS 4
+
 
 static AndroidLogFormat * g_logformat;
 static bool g_nonblock = false;
@@ -31,6 +50,7 @@ static int g_tail_lines = 0;
 #define RECORD_LENGTH_FIELD_SIZE_BYTES sizeof(uint32_t)
 
 #define LOG_FILE_DIR    "/dev/log/"
+#define LAST_ALOG_FILE_DIR    "/proc/" //SW2-5-1-BH-DbgCfgTool-00+
 
 struct queued_entry_t {
     union {
@@ -96,34 +116,56 @@ static int g_outFD = -1;
 static off_t g_outByteCount = 0;
 static int g_printBinary = 0;
 static int g_devCount = 0;
+static int g_isLastAlog = 0; //SW2-5-1-BH-DbgCfgTool-00+
 
 static EventTagMap* g_eventTagMap = NULL;
 
-static int openLogFile (const char *pathname)
+
+static int openLogFile (char *pathname) //SW2-5-1-BH-DbgCfgTool-00*
 {
-    return open(g_outputFileName, O_WRONLY | O_APPEND | O_CREAT, S_IRUSR | S_IWUSR);
+     /*  Set open mode 0644 for 
+        * S_IRUSR / 00400 / USER READ
+        * S_IWUSR / 00200 / USER WRITE
+        * S_IRGRP / 00040 / GROUP READ
+        * S_IROTH / 00004 / OTHER READ
+        */
+    //return open(pathname, O_WRONLY | O_APPEND | O_CREAT, S_IRUSR | S_IWUSR); //SW2-5-1-BH-DbgCftTool-00*
+    return open(pathname, O_WRONLY | O_APPEND | O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
 }
 
 static void rotateLogs()
 {
     int err;
+    char * CurrentFilePath = NULL;  //SW2-5-1-BH-DbgCfgTool-00+
 
     // Can't rotate logs if we're not outputting to a file
     if (g_outputFileName == NULL) {
         return;
     }
 
+    //SW2-5-1-BH-DbgCfgTool-00*[
+    if (flush_to_sdcard)
+    {
+        CurrentFilePath = g_SDFilePath;
+    }
+    else
+    {
+        CurrentFilePath = (char*)g_outputFileName;
+    }
+    //SW2-5-1-BH-DbgCfgTool-00*]
+
     close(g_outFD);
 
+    //SW2-5-1-BH-DbgCfgTool-00*[
     for (int i = g_maxRotatedLogs ; i > 0 ; i--) {
         char *file0, *file1;
 
-        asprintf(&file1, "%s.%d", g_outputFileName, i);
+        asprintf(&file1, "%s.%d", CurrentFilePath, i);
 
         if (i - 1 == 0) {
-            asprintf(&file0, "%s", g_outputFileName);
+            asprintf(&file0, "%s", CurrentFilePath);
         } else {
-            asprintf(&file0, "%s.%d", g_outputFileName, i - 1);
+            asprintf(&file0, "%s.%d", CurrentFilePath, i - 1);
         }
 
         err = rename (file0, file1);
@@ -136,7 +178,8 @@ static void rotateLogs()
         free(file0);
     }
 
-    g_outFD = openLogFile (g_outputFileName);
+    g_outFD = openLogFile (CurrentFilePath);
+    //SW2-5-1-BH-DbgCfgTool-00*]
 
     if (g_outFD < 0) {
         perror ("couldn't open output file");
@@ -247,6 +290,55 @@ static void printNextEntry(log_device_t* dev) {
     skipNextEntry(dev);
 }
 
+//SW2-5-2-MP-DbgCfgTool-00+[
+static void redirect_sdcard_filepath()
+{
+    int err;
+    char cmdString[CMD_STRING_LENGTH];
+    pid_t pid;
+
+    close(g_outFD);
+
+    snprintf(g_SDFilePath, FILE_NAME_LENGTH, "/sdcard/%s", g_SDFileName);
+
+    g_outFD = openLogFile (g_SDFilePath);
+
+    if (g_outFD < 0) {
+        perror ("couldn't open output file");
+        exit(-1);
+    }
+
+    g_outByteCount = 0;
+
+    pid = fork();
+    if (pid == 0) 
+    {
+        // Child process.
+        snprintf(cmdString, CMD_STRING_LENGTH, "cat /data/%s > /sdcard/%s.boot", 
+            g_SDFileName, 
+            g_SDFileName);
+
+        system(cmdString);
+        snprintf(cmdString, CMD_STRING_LENGTH, "rm /data/%s", g_SDFileName);
+        system(cmdString);
+
+        exit(0);
+    } 
+    else if (pid < 0) 
+    {
+        perror ("Fork failed");
+        exit(-1); 
+    } 
+    else 
+    {
+        // Parent process. Return to readLogLines.
+        signal(SIGCHLD, SIG_IGN);  //prevent zombie process
+        return;
+    }
+
+}
+//SW2-5-1-BH-DbgCfgTool-00+]
+
 static void readLogLines(log_device_t* devices)
 {
     log_device_t* dev;
@@ -278,6 +370,29 @@ static void readLogLines(log_device_t* devices)
             for (dev=devices; dev; dev = dev->next) {
                 if (FD_ISSET(dev->fd, &readset)) {
                     queued_entry_t* entry = new queued_entry_t();
+
+                    //SW2-5-1-BH-DbgCfgTool-00+[
+                    if(flush_to_flash_temporarily)
+                    {
+                        time_t current_time;
+                        char value[PROPERTY_VALUE_MAX];
+
+                        time(&current_time);
+
+                        if ((current_time -previous_check_time)>0)
+                        {
+                            previous_check_time = current_time;
+                            property_get("EXTERNAL_STORAGE_STATE", value, "");
+
+                            if(strcmp(value,"Mounted") == 0)
+                            {
+                                redirect_sdcard_filepath();
+                                flush_to_flash_temporarily = 0;
+                            }
+                        }
+                    }
+                    //SW2-5-1-BH-DbgCfgTool-00+]
+
                     /* NOTE: driver guarantees we read exactly one full entry */
                     ret = read(dev->fd, entry->buf, LOGGER_ENTRY_MAX_LEN);
                     if (ret < 0) {
@@ -293,8 +408,18 @@ static void readLogLines(log_device_t* devices)
                         exit(EXIT_FAILURE);
                     }
                     else if (!ret) {
-                        fprintf(stderr, "read: Unexpected EOF!\n");
-                        exit(EXIT_FAILURE);
+                        //SW2-5-1-BH-DbgCfgTool-00*[
+                        if (g_isLastAlog)
+                        {
+                            fprintf(stderr, "read: EOF!\n");
+                            exit(0);
+                        }
+                        else
+                        {
+                            fprintf(stderr, "read: Unexpected EOF!\n");
+                            exit(EXIT_FAILURE);
+                        }
+                        //SW2-5-1-BH-DbgCfgTool-00*]
                     }
 
                     entry->entry.msg[entry->entry.len] = '\0';
@@ -373,7 +498,69 @@ static void setupOutput()
     } else {
         struct stat statbuf;
 
-        g_outFD = openLogFile (g_outputFileName);
+        //SW2-5-1-BH-DbgCfgTool-00+[
+        const char * base_name = NULL;
+
+        if(strcmp(g_outputFileName, LOG_MAIN_SD_PATH) == 0)
+        {
+            flush_to_sdcard = 1;
+            flush_to_flash_temporarily = 1;
+            base_name = "alog";
+        }
+        else if (strcmp(g_outputFileName, LOG_RADIO_SD_PATH) == 0)
+        {
+            flush_to_sdcard = 1;
+            flush_to_flash_temporarily = 1;
+            base_name = "alog_radio";
+        }
+        else if (strcmp(g_outputFileName, LOG_SYSTEM_SD_PATH) == 0)
+        {
+            flush_to_sdcard = 1;
+            flush_to_flash_temporarily = 1;
+            base_name = "alog_system";
+        }
+        //SW-2-5-1-BH-EventsLog-00+[
+        else if (strcmp(g_outputFileName, LOG_EVENTS_SD_PATH) == 0)
+        {
+            flush_to_sdcard = 1;
+            flush_to_flash_temporarily = 1;
+            base_name = "alog_events";
+        }
+        //SW-2-5-1-BH-EventsLog-00+]
+
+        if (flush_to_flash_temporarily)
+        {
+            struct tm *tm_ptr;
+            time_t the_time;
+
+            time(&the_time);
+            tm_ptr = localtime(&the_time);
+
+            snprintf(g_SDFileName, FILE_NAME_LENGTH, "SD_%04d%02d%02d_%02d%02d%02d_%s", 
+                            (tm_ptr->tm_year)+1900, 
+                            (tm_ptr->tm_mon)+1, 
+                            tm_ptr->tm_mday, 
+                            tm_ptr->tm_hour, 
+                            tm_ptr->tm_min,
+                            tm_ptr->tm_sec,
+                            base_name);
+
+            snprintf(g_SDFilePath, FILE_NAME_LENGTH, "/data/%s", g_SDFileName);
+
+            g_outFD = openLogFile (g_SDFilePath);
+
+            if (g_outFD < 0) {
+                perror ("couldn't open output file");
+                exit(-1);
+            }
+
+            fstat(g_outFD, &statbuf);
+            g_outByteCount = statbuf.st_size;
+            return;
+        }
+
+        g_outFD = openLogFile ((char*)g_outputFileName);
+	//SW2-5-1-BH-DbgCfgTool-00*]
 
         if (g_outFD < 0) {
             perror ("couldn't open output file");
@@ -460,6 +647,7 @@ int main(int argc, char **argv)
     log_device_t* dev;
     bool needBinary = false;
 
+
     g_logformat = android_log_format_new();
 
     if (argc == 2 && 0 == strcmp(argv[1], "--test")) {
@@ -506,11 +694,27 @@ int main(int argc, char **argv)
             break;
 
             case 'b': {
-                char* buf = (char*) malloc(strlen(LOG_FILE_DIR) + strlen(optarg) + 1);
-                strcpy(buf, LOG_FILE_DIR);
+                //SW2-5-1-BH-DbgCfgTool-00*[
+                char *buf;
+                bool binary;
+				
+                if (strncmp(optarg, "last_alog",9))
+                {
+                    buf = (char*) malloc(strlen(LOG_FILE_DIR) + strlen(optarg) + 1);
+                    strcpy(buf, LOG_FILE_DIR);
+                    binary = strcmp(optarg, "events") == 0;
+                    android::g_isLastAlog = 0;
+                }
+                else
+                {
+                    buf = (char*) malloc(strlen(LAST_ALOG_FILE_DIR) + strlen(optarg) + 1);
+                    strcpy(buf, LAST_ALOG_FILE_DIR);
+                    binary = strcmp(optarg, "last_alog_events") == 0;
+                    android::g_isLastAlog = 1;
+                }
                 strcat(buf, optarg);
+                //SW2-5-1-BH-DbgCfgTool-00*]
 
-                bool binary = strcmp(optarg, "events") == 0;
                 if (binary) {
                     needBinary = true;
                 }
@@ -778,6 +982,7 @@ int main(int argc, char **argv)
         android::g_eventTagMap = android_openEventTagMap(EVENT_TAG_MAP_FILE);
 
     android::readLogLines(devices);
+
 
     return 0;
 }

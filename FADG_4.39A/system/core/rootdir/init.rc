@@ -143,7 +143,9 @@ on post-fs
     chmod 0220 /proc/sysrq-trigger
 
 # create basic filesystem structure
-    mkdir /data/misc 01771 system misc
+    # SW2-5-1-BH-DbgCfgTool-00*[
+    mkdir /data/misc 01777 system misc
+    # SW2-5-1-BH-DbgCfgTool-00*]
     mkdir /data/misc/bluetoothd 0770 bluetooth bluetooth
     mkdir /data/misc/bluetooth 0770 system system
     mkdir /data/misc/keystore 0700 keystore keystore
@@ -155,7 +157,8 @@ on post-fs
     chmod 0770 /data/misc/wifi
     chmod 0660 /data/misc/wifi/wpa_supplicant.conf
     mkdir /data/local 0771 shell shell
-    mkdir /data/local/tmp 0771 shell shell
+    # ShaunLuo @ 20110111 : chmod 777 to /data/local/tmp
+    mkdir /data/local/tmp 0777 shell shell
     mkdir /data/data 0771 system system
     mkdir /data/app-private 0771 system system
     mkdir /data/app 0771 system system
@@ -176,6 +179,26 @@ on post-fs
     chown root root /cache/lost+found
     chmod 0770 /cache/lost+found
 
+    # Fihtdc@Tywald Porting DRM for DMQG.B-1374 start
+    # Discretix DRM change start
+    mkdir /data/DxDrm
+    mkdir /data/DxDrm/fuse
+    chmod 555 /data/DxDrm
+    mkdir /sdcard/download   
+    # Discretix DRM change end
+    #Fihtdc@Tywald Porting DRM for DMQG.B-1374 End
+    
+    #+++ FIH; Michael; 2010/11/04 
+    mkdir /data/efslog 0777 system system
+    mkdir /data/efslog/err 0777 system system
+    mkdir /data/efslog/OEMDBG_LOG 0777 system system
+    #--- FIH; Michael; 2010/11/04 
+
+    #SW2-5-2-MP-DbgCfgTool-00+[
+    chmod 0666 /dev/dbgcfgtool
+    mkdir /data/last_kmsg 0777 system system
+    mkdir /data/last_alog 0777 system system
+    #SW2-5-2-MP-DbgCfgTool-00+]
 on boot
 # basic network init
     ifup lo
@@ -289,6 +312,11 @@ service console /system/bin/sh
 on property:ro.secure=0
     start console
 
+#SW2-5-1-BH-DbgCfgToolTool-00+ Add 'loggerlauncher' socket
+service loggerlauncher /system/bin/loggerlauncher
+    oneshot
+    socket loggerlauncher stream 666 system system
+
 # adbd is controlled by the persist.service.adb.enable system property
 service adbd /sbin/adbd
     disabled
@@ -385,6 +413,13 @@ service installd /system/bin/installd
 service flash_recovery /system/etc/install-recovery.sh
     oneshot
 
+# Fihtdc@Tywald Porting DRM for DMQG.B-1374 start
+# Discretix DRM change start
+service dx_drm_server /system/bin/DxDrmServerIpc -f -o allow_other /data/DxDrm/fuse
+    user media
+# Discretix DRM change end
+# Fihtdc@Tywald Porting DRM for DMQG.B-1374 End
+
 service racoon /system/bin/racoon
     socket racoon stream 600 system system
     # racoon will setuid to vpn after getting necessary resources.
@@ -408,3 +443,10 @@ service dumpstate /system/bin/dumpstate -s
     socket dumpstate stream 0660 shell log
     disabled
     oneshot
+
+#//Div6-PT2-MM-PG-FM_VOL-00-{
+service fm_server /system/bin/fm_server
+    user root
+    group root root
+    oneshot
+#//Div6-PT2-MM-PG-FM_VOL-00-}

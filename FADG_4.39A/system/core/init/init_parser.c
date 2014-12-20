@@ -112,6 +112,7 @@ int lookup_keyword(const char *s)
         break;
     case 'l':
         if (!strcmp(s, "oglevel")) return K_loglevel;
+        if (!strcmp(s, "osetup")) return K_losetup;  //Div6-D1-JL-UsbPorting-00+  Pc-tool
         break;
     case 'm':
         if (!strcmp(s, "kdir")) return K_mkdir;

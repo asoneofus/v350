@@ -53,8 +53,18 @@ TOOLS := \
 	uptime \
 	vmstat \
 	nandread \
+    	write \
 	ionice \
-	lsof
+	lsof \
+	qxdmlog \
+                  
+
+# DIV2-MM-SC-JNI_INTERFACE-00-{
+ifeq ($(BOARD_HAS_BCM_CHIP), true)
+    TOOLS += fmappsckt
+    TOOLS += fm_server    
+endif
+# DIV2-MM-SC-JNI_INTERFACE-00-}                   
 
 LOCAL_SRC_FILES:= \
 	toolbox.c \

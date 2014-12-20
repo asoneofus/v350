@@ -52,6 +52,7 @@
 #define AID_VPN           1016  /* vpn system */
 #define AID_KEYSTORE      1017  /* keystore subsystem */
 #define AID_USB           1018  /* USB devices */
+#define AID_FM_RADIO      1019  /* FM radio */  //FIH, KarenLiao, 2011/01/24, DMQG.F-5: (DM-BL-9-5)FM radio. Porting DMQ/DPD FM to Gingerbread.
 #define AID_GPS           1021  /* GPS daemon */
 #define AID_UNUSED1       1022  /* deprecated, DO NOT USE */
 #define AID_RFU1          1023  /* RFU */
@@ -69,6 +70,7 @@
 #define AID_INET          3003  /* can create AF_INET and AF_INET6 sockets */
 #define AID_NET_RAW       3004  /* can create raw INET sockets */
 #define AID_NET_ADMIN     3005  /* can configure interfaces and routing tables. */
+#define AID_QCOM_ONCRPC   3006  /* can read/write /dev/oncrpc files */
 
 #define AID_MISC          9998  /* access to misc storage */
 #define AID_NOBODY        9999
@@ -112,7 +114,9 @@ static const struct android_id_info android_ids[] = {
     { "inet",      AID_INET, },
     { "net_raw",   AID_NET_RAW, },
     { "net_admin", AID_NET_ADMIN, },
+    { "qcom_oncrpc", AID_QCOM_ONCRPC, },
     { "misc",      AID_MISC, },
+    { "fm_radio",   AID_FM_RADIO, },  //FIH, KarenLiao, 2011/01/24, DMQG.F-5: (DM-BL-9-5)FM radio. Porting DMQ/DPD FM to Gingerbread.
     { "nobody",    AID_NOBODY, },
 };
 
@@ -144,6 +148,7 @@ static struct fs_path_config android_dirs[] = {
     { 00770, AID_DHCP,   AID_DHCP,   "data/misc/dhcp" },
     { 00771, AID_SYSTEM, AID_SYSTEM, "data" },
     { 00750, AID_ROOT,   AID_SHELL,  "sbin" },
+    { 04750, AID_MEDIA,  AID_MEDIA,  "system/bin/DxDrm" },  /* Discretix change */
     { 00755, AID_ROOT,   AID_SHELL,  "system/bin" },
     { 00755, AID_ROOT,   AID_SHELL,  "system/vendor" },
     { 00755, AID_ROOT,   AID_SHELL,  "system/xbin" },
@@ -161,6 +166,7 @@ static struct fs_path_config android_dirs[] = {
 static struct fs_path_config android_files[] = {
     { 00440, AID_ROOT,      AID_SHELL,     "system/etc/init.goldfish.rc" },
     { 00550, AID_ROOT,      AID_SHELL,     "system/etc/init.goldfish.sh" },
+    { 00550, AID_WIFI,      AID_WIFI,      "system/etc/init.qcom.sdio.sh" },
     { 00440, AID_ROOT,      AID_SHELL,     "system/etc/init.trout.rc" },
     { 00550, AID_ROOT,      AID_SHELL,     "system/etc/init.ril" },
     { 00550, AID_ROOT,      AID_SHELL,     "system/etc/init.testmenu" },
@@ -188,8 +194,13 @@ static struct fs_path_config android_files[] = {
     { 06755, AID_ROOT,      AID_ROOT,      "system/xbin/procmem" },
     { 06755, AID_ROOT,      AID_ROOT,      "system/xbin/tcpdump" },
     { 04770, AID_ROOT,      AID_RADIO,     "system/bin/pppd-ril" },
+    /* FihtdcCode@20090918 RhysChuang for changed file attribute begin */
+    /* FihtdcCode@20110713 KevinChen for CTS request */
+    //{ 06755, AID_ROOT,      AID_ROOT,      "system/bin/PCSyncToolDBModifier" },
+    /* FihtdcCode@20090918 RhysChuang for changed file attribute end */    
 		/* the following file is INTENTIONALLY set-uid, and IS included
 		 * in user builds. */
+    { 04755, AID_ROOT,      AID_SYSTEM,    "system/bin/DxDrm/fusermount" }, /* Discretix change */
     { 06750, AID_ROOT,      AID_SHELL,     "system/bin/run-as" },
     { 00755, AID_ROOT,      AID_SHELL,     "system/bin/*" },
     { 00755, AID_ROOT,      AID_SHELL,     "system/xbin/*" },

@@ -31,6 +31,17 @@
 
 #define LOG_BUF_SIZE	1024
 
+//SW2-5-1-BH-DbgCfgTool-00+[
+#include <sys/ioctl.h>
+#include <cutils/dbgcfgtool.h>
+#include <sys/uio.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <cutils/logprint.h>
+static int debug_android_uartmsg_enable = 0;
+static int console_fd = -1;
+//SW2-5-1-BH-DbgCfgTool-00+]
+
 #if FAKE_LOG_DEVICE
 // This will be defined when building for the host.
 #define log_open(pathname, flags) fakeLogOpen(pathname, flags)
@@ -80,6 +91,29 @@ static int __write_to_log_kernel(log_id_t log_id, struct iovec *vec, size_t nr)
     ssize_t ret;
     int log_fd;
 
+//SW2-5-1-BH-DbgCfgTool-00+[
+    char uartmsg_buffer[LOG_BUF_SIZE];
+    int pri = *(int*)(vec[0].iov_base);
+
+    if (debug_android_uartmsg_enable && 
+        (strcmp(vec[1].iov_base,"klogd") != 0) &&
+        (pri >= ANDROID_LOG_VERBOSE && pri <= ANDROID_LOG_SILENT))
+    {
+        if( 0 > snprintf(uartmsg_buffer, LOG_BUF_SIZE, "%c/%s: %s\r\n",filterPriToChar (pri),(char *)vec[1].iov_base,(char *)vec[2].iov_base))
+        {
+            fprintf(stderr,"logd_write: snprintf error (%s)\n",strerror(errno));
+        }
+        else
+        {
+            if ( 0 > write(console_fd,uartmsg_buffer,strlen(uartmsg_buffer)))
+            {
+            fprintf(stderr,"logd_write: write error (%s)\n",strerror(errno));
+            }
+        }
+
+    }
+//SW2-5-1-BH-DbgCfgTool-00+]
+
     if (/*(int)log_id >= 0 &&*/ (int)log_id < (int)LOG_ID_MAX) {
         log_fd = log_fds[(int)log_id];
     } else {
@@ -92,6 +126,47 @@ static int __write_to_log_kernel(log_id_t log_id, struct iovec *vec, size_t nr)
 
     return ret;
 }
+
+//SW2-5-1-BH-DbgCfgTool-00+[
+void android_dbgcfg_init(void)
+{
+    int dbgcfgtool_fd = -1;
+    dbgcfg_ioctl_arg arg;
+    
+    arg.id.bit_id = DEBUG_ANDROID_UARTMSG_CFG;
+
+    dbgcfgtool_fd = open(dbgcfgtool_name, O_RDWR);
+    
+    if (dbgcfgtool_fd < 0) {
+        fprintf(stderr,"logd_write: cannot open device (%s)\n",strerror(errno));
+        return;
+    }
+
+    if (ioctl(dbgcfgtool_fd, DBG_IOCTL_CMD_GET_DBGCFG_BIT, &arg) < 0)
+    {
+        fprintf(stderr,"logd_write: DBG_IOCTL_CMD_GET_DBGCFG ioctl fails (%s)\n",
+                strerror(errno));
+        close(dbgcfgtool_fd);
+        return;
+    }
+
+    close(dbgcfgtool_fd);
+
+    if (arg.value == 1)  //DEBUG_ANDROID_UARTMSG_CFG is ON
+    {
+        debug_android_uartmsg_enable = 1;
+
+        console_fd = open("/dev/console", O_WRONLY);
+
+        if (console_fd < 0 )
+        {
+            fprintf(stderr, "logd_write: Unable to open /dev/console (%s)\n",strerror(errno));
+            return;
+        }
+    }
+
+}
+//SW2-5-1-BH-DbgCfgTool-00+]
 
 static int __write_to_log_init(log_id_t log_id, struct iovec *vec, size_t nr)
 {
@@ -127,6 +202,8 @@ static int __write_to_log_init(log_id_t log_id, struct iovec *vec, size_t nr)
     pthread_mutex_unlock(&log_init_lock);
 #endif
 
+    android_dbgcfg_init();  //SW2-5-1-BH-DbgCfgTool-00+
+
     return write_to_log(log_id, vec, nr);
 }
 
@@ -146,7 +223,22 @@ int __android_log_write(int prio, const char *tag, const char *msg)
         !strcmp(tag, "STK") ||
         !strcmp(tag, "CDMA") ||
         !strcmp(tag, "PHONE") ||
-        !strcmp(tag, "SMS"))
+        !strcmp(tag, "SMS") ||
+        //SW2-5-1-BH-DbgCfgTool-00+[
+        /* {{[FB0G.B-1091][Log] Print the log to ADB, PhilipWYHuang, 20111111 */
+        !strcmp(tag, "QC-NETMGR-LIB") ||
+        !strcmp(tag, "QC-DS-LIB") ||
+        /* }}[FB0G.B-1091] PhilipWYHuang, 20111111 */
+        !strcmp(tag, "QC-DSS-LIB") ||
+        !strcmp(tag, "QC-QMI") ||
+        !strcmp(tag, "Dun Auto Boot") ||
+        !strcmp(tag, "PORT_BRIDGE") ||
+        !strcmp(tag, "CallNotifier") ||
+        !strcmp(tag, "GpsLocationProvider") ||
+        !strcmp(tag, "QCRIL") ||
+        !strcmp(tag, "Phone")
+        //SW2-5-1-BH-DbgCfgTool-00+]
+        )
             log_id = LOG_ID_RADIO;
 
     vec[0].iov_base   = (unsigned char *) &prio;
@@ -174,7 +266,22 @@ int __android_log_buf_write(int bufID, int prio, const char *tag, const char *ms
         !strcmp(tag, "STK") ||
         !strcmp(tag, "CDMA") ||
         !strcmp(tag, "PHONE") ||
-        !strcmp(tag, "SMS"))
+        !strcmp(tag, "SMS") ||
+        //SW2-5-1-BH-DbgCfgTool-00+[
+        /* {{[FB0G.B-1091][Log] Print the log to ADB, PhilipWYHuang, 20111111 */
+        !strcmp(tag, "QC-NETMGR-LIB") ||
+        !strcmp(tag, "QC-DS-LIB") ||
+        /* }}[FB0G.B-1091] PhilipWYHuang, 20111111 */
+        !strcmp(tag, "QC-DSS-LIB") ||
+        !strcmp(tag, "QC-QMI") ||
+        !strcmp(tag, "Dun Auto Boot") ||
+        !strcmp(tag, "PORT_BRIDGE") ||
+        !strcmp(tag, "CallNotifier") ||
+        !strcmp(tag, "GpsLocationProvider") ||
+        !strcmp(tag, "QCRIL") ||
+        !strcmp(tag, "Phone")
+        //SW2-5-1-BH-DbgCfgTool-00+]
+        )
             bufID = LOG_ID_RADIO;
 
     vec[0].iov_base   = (unsigned char *) &prio;

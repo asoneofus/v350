@@ -51,6 +51,13 @@
 #include "init_parser.h"
 #include "util.h"
 #include "ueventd.h"
+#define RUNIT_SERVICE
+//SW2-5-2-MP-DbgCfgTool-00+[
+#include <sys/ioctl.h>
+#include <cutils/dbgcfgtool.h>
+static int debug_printf_uartmsg_enable = 0;
+int clean_boot = 0; 
+//SW2-5-2-MP-DbgCfgTool-00+]
 
 static int property_triggers_enabled = 0;
 
@@ -65,6 +72,9 @@ static char baseband[32];
 static char carrier[32];
 static char bootloader[32];
 static char hardware[32];
+//Michael add for power off alarm+++
+static char POC[32];
+//Michael add for power off alarm---
 static unsigned revision = 0;
 static char qemu[32];
 
@@ -87,6 +97,9 @@ static char *console_name = "/dev/console";
 static time_t process_needs_restart;
 
 static const char *ENV[32];
+
+static unsigned emmc_boot = 0;
+static unsigned battchg_pause = 0;
 
 /* add_environment - add "key=value" to the current environment */
 int add_environment(const char *key, const char *val)
@@ -416,7 +429,15 @@ static void import_kernel_nv(char *name, int in_qemu)
             strlcpy(bootloader, value, sizeof(bootloader));
         } else if (!strcmp(name,"androidboot.hardware")) {
             strlcpy(hardware, value, sizeof(hardware));
+        } else if (!strcmp(name,"androidboot.emmc")) {
+            if (!strcmp(value,"true")) {
+                emmc_boot = 1;
+            }
         }
+        else if (!strcmp(name,"androidboot.battchg_pause")) {
+            if (!strcmp(value,"true")) {
+                battchg_pause = 1;
+            }}
     } else {
         /* in the emulator, export any kernel option with the
          * ro.kernel. prefix */
@@ -486,7 +507,26 @@ static int is_last_command(struct action *act, struct command *cmd)
 {
     return (list_tail(&act->commands) == &cmd->clist);
 }
+//Michael add for power off alarm+++
+static void get_power_on_cause(void)
+{
+    char data[32];
+    int fd, n;
+	memset(POC,0,32*sizeof(char));
+	memset(data,0,32*sizeof(char));
 
+    fd = open("/proc/poweroncause", O_RDONLY);
+    if (fd < 0) return;
+
+    n = read(fd, data, 32);
+    INFO("[init.c]get_power_on_cause data=%s",data);
+    close(fd);
+    if (n < 0) return;
+    
+	memcpy(POC, data,(n-1));
+	INFO("[init.c]get_power_on_cause=%s",POC);
+}
+//Michael add for power off alarm---
 void execute_one_command(void)
 {
     int ret;
@@ -513,7 +553,10 @@ static int wait_for_coldboot_done_action(int nargs, char **args)
 {
     int ret;
     INFO("wait for %s\n", coldboot_done);
-    ret = wait_for_file(coldboot_done, COMMAND_RETRY_TIMEOUT);
+    /* FIHNJDC, SW4-BSP Sinkin, 2011/10/20{ */
+    /* Change timeout to wait for ueventd */
+    ret = wait_for_file(coldboot_done, 10/*COMMAND_RETRY_TIMEOUT*/);
+    /* FIHNJDC, SW4-BSP Sinkin, 2011/10/20 } */
     if (ret)
         ERROR("Timed out waiting for %s\n", coldboot_done);
     return ret;
@@ -592,10 +635,13 @@ static int set_init_properties_action(int nargs, char **args)
     property_set("ro.baseband", baseband[0] ? baseband : "unknown");
     property_set("ro.carrier", carrier[0] ? carrier : "unknown");
     property_set("ro.bootloader", bootloader[0] ? bootloader : "unknown");
-
+    //Michael add for power off alarm+++
+    property_set("ro.system.boot.cause", POC[0] ? POC : "unknown");
+    //Michael add for power off alarm---
     property_set("ro.hardware", hardware);
     snprintf(tmp, PROP_VALUE_MAX, "%d", revision);
     property_set("ro.revision", tmp);
+    property_set("ro.emmc",emmc_boot ? "1" : "0");
     return 0;
 }
 
@@ -610,6 +656,13 @@ static int property_service_init_action(int nargs, char **args)
     return 0;
 }
 
+#ifdef RUNIT_SERVICE
+static int runit_service_init_action(int nargs, char **args)
+{
+    start_runit_service();
+    return 0;
+}
+#endif
 static int signal_init_action(int nargs, char **args)
 {
     signal_init();
@@ -649,17 +702,134 @@ static int bootchart_init_action(int nargs, char **args)
 }
 #endif
 
+//SW2-5-2-MP-DbgCfgTool-00+[
+void uart_dbgcfg_init(void)
+{
+    int clean_boot_file_fd = -1, dbgcfgtool_fd = -1;
+    dbgcfg_ioctl_arg arg;
+    
+    /* Clean boot file will be created in LoggerLauncher.
+       So we assert the clean_boot flag if this file is not existed in nand flash.*/
+    clean_boot_file_fd = open(CLEAN_BOOT_FILE_PATH, O_RDWR);
+    if ( clean_boot_file_fd < 0)
+    {
+        clean_boot = 1;
+        printf("init: Clean Boot !!\n");
+    }
+    else
+    {
+        close(clean_boot_file_fd);
+    }
+
+    arg.id.group_id = DEBUG_UART_GROUP;
+
+    dbgcfgtool_fd = open(dbgcfgtool_name, O_RDWR);
+    if (dbgcfgtool_fd < 0) {
+        fprintf(stderr,"init: cannot open dbgcfgtool(%s)\n",
+                strerror(errno));
+        return;
+    }
+
+    if (clean_boot == 1)
+    {
+        dbgcfg_ioctl_arg arg;
+
+        /* Initialize DEBUG_UART_GROUP */
+        arg.id.group_id = DEBUG_UART_GROUP;
+        arg.value = 0;
+        if (ioctl(dbgcfgtool_fd, DBG_IOCTL_CMD_SET_DBGCFG_GROUP, &arg) < 0)
+        {
+            fprintf(stderr,"init: DBG_IOCTL_CMD_SET_DBGCFG_GROUP ioctl fails (%s)\n", strerror(errno));
+            close(dbgcfgtool_fd);
+            return;
+        }
+
+        close(dbgcfgtool_fd);
+        return;
+    }
+
+    if (ioctl(dbgcfgtool_fd, DBG_IOCTL_CMD_GET_DBGCFG_GROUP, &arg) < 0)
+    {
+        fprintf(stderr,"init: DBG_IOCTL_CMD_GET_DBGCFG_GROUP ioctl fails (%s)\n", strerror(errno));
+        close(dbgcfgtool_fd);
+        return;
+    }
+
+    close(dbgcfgtool_fd);
+
+    if (arg.value & (1 << (DEBUG_PRINTF_UARTMSG_CFG % GROUP_SIZE)))  //DEBUG_PRINTF_UARTMSG_CFG is ON
+    {
+        debug_printf_uartmsg_enable = 1;
+        chmod(console_name, 0666);
+    }
+    
+    if (arg.value & (1 << (DEBUG_ANDROID_UARTMSG_CFG % GROUP_SIZE)))  //DEBUG_ANDROID_UARTMSG_CFG is ON
+    {
+        chmod(console_name, 0666);
+    }
+}
+//SW2-5-2-MP-DbgCfgTool-00+]
+
+//WeiChihChen@20110309@Support ext3 format of emmc data partion BEGIN
+#ifdef EMMC_DATA_FORMAT
+// Div2-SW2-BSP,JOE HSU,+++
+static unsigned emmc_format = 0;
+
+static void check_data_partition(void)
+{
+    char data[1024];
+    int fd, n;
+    char *check;
+    //struct statfs st;
+
+    fd = open("/proc/mounts", O_RDONLY);
+    if (fd < 0) return;
+
+    n = read(fd, data, 1023);
+    close(fd);
+    if (n < 0) return;
+
+    data[n] = 0;
+    check = strstr(data, "\n/dev/block/mmcblk0p8");
+    if (!check) {
+        emmc_format = 1;
+     }
+/*
+     else {
+            statfs("/data", &st);
+            ERROR("/data: %lldK total, %lldK used, %lldK available (block size %d)\n",
+               ((long long)st.f_blocks * (long long)st.f_bsize) / 1024,
+               ((long long)(st.f_blocks - (long long)st.f_bfree) * st.f_bsize) / 1024,
+               ((long long)st.f_bfree * (long long)st.f_bsize) / 1024,
+               (int) st.f_bsize);
+            if((((long long)st.f_blocks * (long long)st.f_bsize) / 1024) < 80000 ) {
+                emmc_umount = 1;
+                emmc_format = 1;
+             }
+       }
+*/
+}
+//Div2-SW2-BSP,JOE HSU,---
+#endif //EMMC_DATA_FORMAT
+//WeiChihChen@20110309@Support ext3 format of emmc data partion END
+
 int main(int argc, char **argv)
 {
     int fd_count = 0;
+#ifdef RUNIT_SERVICE
+    struct pollfd ufds[5];
+#else
     struct pollfd ufds[4];
+#endif
     char *tmpdev;
     char* debuggable;
     char tmp[32];
     int property_set_fd_init = 0;
     int signal_fd_init = 0;
     int keychord_fd_init = 0;
-
+#ifdef RUNIT_SERVICE
+    int runit_fd_init = 0;
+#endif
     if (!strcmp(basename(argv[0]), "ueventd"))
         return ueventd_main(argc, argv);
 
@@ -700,8 +870,22 @@ int main(int argc, char **argv)
     snprintf(tmp, sizeof(tmp), "/init.%s.rc", hardware);
     init_parse_config_file(tmp);
 
-    action_for_each_trigger("early-init", action_add_queue_tail);
+#if defined(BROADCOM_BT)
+    init_parse_config_file("/init.broadcom.bt.rc");
+#else
+    init_parse_config_file("/init.qcom.bt.rc");
+#endif
 
+#if defined(BROADCOM_WLAN)
+    init_parse_config_file("/init.broadcom.wifi.rc");
+#else
+    init_parse_config_file("/init.qcom.wifi.rc");
+#endif
+
+    action_for_each_trigger("early-init", action_add_queue_tail);
+    //Michael add for power off alarm+++
+    get_power_on_cause();
+    //Michael add for power off alarm---
     queue_builtin_action(wait_for_coldboot_done_action, "wait_for_coldboot_done");
     queue_builtin_action(property_init_action, "property_init");
     queue_builtin_action(keychord_init_action, "keychord_init");
@@ -711,13 +895,40 @@ int main(int argc, char **argv)
         /* execute all the boot actions to get us started */
     action_for_each_trigger("init", action_add_queue_tail);
     action_for_each_trigger("early-fs", action_add_queue_tail);
+/* pause if necessary */
+//if (battchg_pause) {
+//    	pid_t pid;
+//	pid = fork();
+//    	if (!pid)
+//       	execv("/sbin/pcharger",NULL);
+//    }
     action_for_each_trigger("fs", action_add_queue_tail);
+
+//WeiChihChen@20110309@Support ext3 format of emmc data partion BEGIN
+#ifdef EMMC_DATA_FORMAT
+// Div2-SW2-BSP,JOE HSU,+++
+    if (emmc_format == 0)
+       check_data_partition();
+
+    //ERROR("emmc_format =%d ...\n",emmc_format);
+    if (emmc_format){
+        action_for_each_trigger("format", action_add_queue_tail);
+     }
+// Div2-SW2-BSP,JOE HSU,---
+#endif //EMMC_DATA_FORMAT
+//WeiChihChen@20110309@Support ext3 format of emmc data partion END
+
     action_for_each_trigger("post-fs", action_add_queue_tail);
 
     queue_builtin_action(property_service_init_action, "property_service_init");
     queue_builtin_action(signal_init_action, "signal_init");
     queue_builtin_action(check_startup_action, "check_startup");
-
+#ifdef RUNIT_SERVICE
+    queue_builtin_action(runit_service_init_action, "runit_service_init");
+#endif
+	if (battchg_pause) {
+        action_for_each_trigger("boot-pause", action_add_queue_tail);
+    }
     /* execute all the boot actions to get us started */
     action_for_each_trigger("early-boot", action_add_queue_tail);
     action_for_each_trigger("boot", action_add_queue_tail);
@@ -725,6 +936,10 @@ int main(int argc, char **argv)
         /* run all property triggers based on current state of the properties */
     queue_builtin_action(queue_property_triggers_action, "queue_propety_triggers");
 
+// FIHTDC, HenryMCWang, log modem logs {
+    //do_mlog();
+    //do_reboot_count_file();
+// } FIHTDC, HenryMCWang, log modem logs
 
 #if BOOTCHART
     queue_builtin_action(bootchart_init_action, "bootchart_init");
@@ -757,7 +972,15 @@ int main(int argc, char **argv)
             fd_count++;
             keychord_fd_init = 1;
         }
-
+#ifdef RUNIT_SERVICE
+        if (!runit_fd_init && get_runit_fd() > 0) {
+            ufds[fd_count].fd = get_runit_fd();
+            ufds[fd_count].events = POLLIN;
+            ufds[fd_count].revents = 0;
+            fd_count++;
+            runit_fd_init = 1;
+        }
+#endif
         if (process_needs_restart) {
             timeout = (process_needs_restart - gettime()) * 1000;
             if (timeout < 0)
@@ -790,6 +1013,10 @@ int main(int argc, char **argv)
                     handle_keychord();
                 else if (ufds[i].fd == get_signal_fd())
                     handle_signal();
+#ifdef RUNIT_SERVICE
+		else if (ufds[i].fd == get_runit_fd())
+                    handle_runit_fd();
+#endif
             }
         }
     }
